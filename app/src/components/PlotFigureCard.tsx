@@ -1,6 +1,5 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import type * as Plotly from "plotly.js";
-import Plot from "react-plotly.js";
 import type { PlotlyFigure } from "../plotly/adapters";
 
 interface PlotFigureCardProps {
@@ -9,7 +8,121 @@ interface PlotFigureCardProps {
   lastError: string | null;
 }
 
+interface PlotlyRuntime {
+  react: (
+    root: HTMLElement,
+    data: Plotly.Data[],
+    layout: Partial<Plotly.Layout>,
+    config: Partial<Plotly.Config>
+  ) => Promise<unknown> | unknown;
+  purge: (root: HTMLElement) => void;
+  Plots?: {
+    resize: (root: HTMLElement) => void;
+  };
+}
+
+function cloneFigureForPlotly(figure: PlotlyFigure): {
+  data: Plotly.Data[];
+  layout: Partial<Plotly.Layout>;
+} {
+  const data = figure.data.map((trace) => ({
+    ...trace,
+    x: trace.x == null ? undefined : [...trace.x],
+    y: trace.y == null ? undefined : [...trace.y],
+    customdata: trace.customdata == null ? undefined : [...trace.customdata]
+  })) as unknown as Plotly.Data[];
+
+  const layout = {
+    ...figure.layout,
+    title: figure.layout.title == null ? undefined : { ...figure.layout.title },
+    xaxis:
+      figure.layout.xaxis == null
+        ? undefined
+        : {
+            ...figure.layout.xaxis,
+            title: figure.layout.xaxis.title == null ? undefined : { ...figure.layout.xaxis.title }
+          },
+    yaxis:
+      figure.layout.yaxis == null
+        ? undefined
+        : {
+            ...figure.layout.yaxis,
+            title: figure.layout.yaxis.title == null ? undefined : { ...figure.layout.yaxis.title }
+          }
+  } as unknown as Partial<Plotly.Layout>;
+
+  return { data, layout };
+}
+
+function drawFigure(
+  runtime: PlotlyRuntime,
+  root: HTMLDivElement,
+  figure: PlotlyFigure
+): void {
+  const { data, layout } = cloneFigureForPlotly(figure);
+  void runtime.react(root, data, layout, { responsive: true });
+}
+
 export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardProps): JSX.Element {
+  const plotRootRef = useRef<HTMLDivElement | null>(null);
+  const runtimeRef = useRef<PlotlyRuntime | null>(null);
+
+  useEffect(() => {
+    if (import.meta.env.MODE === "test") {
+      return;
+    }
+
+    const root = plotRootRef.current;
+    if (root == null) {
+      return;
+    }
+
+    const setup = async (): Promise<void> => {
+      const module = await import("plotly.js-dist-min");
+      const runtime = module.default as unknown as PlotlyRuntime;
+      runtimeRef.current = runtime;
+    };
+
+    void setup();
+
+    const handleResize = (): void => {
+      const runtime = runtimeRef.current;
+      if (runtime?.Plots == null) {
+        return;
+      }
+
+      runtime.Plots.resize(root);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      const runtime = runtimeRef.current;
+      runtimeRef.current = null;
+      if (runtime != null) {
+        try {
+          runtime.purge(root);
+        } catch {
+          // Ignore teardown races from Plotly internals during development reloads.
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (import.meta.env.MODE === "test") {
+      return;
+    }
+
+    const runtime = runtimeRef.current;
+    const root = plotRootRef.current;
+    if (runtime == null || root == null) {
+      return;
+    }
+
+    drawFigure(runtime, root, figure);
+  }, [figure]);
+
   return (
     <section aria-label="Trend chart" style={styles.panel}>
       <div style={styles.panelHeader}>
@@ -17,20 +130,19 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
         <p style={styles.panelSubtitle}>{figure.layout.title?.text ?? "Untitled figure"}</p>
       </div>
 
-      {isLoading ? <p role="status">Loading data...</p> : null}
-      {lastError != null ? <p role="alert">{lastError}</p> : null}
-
-      {!isLoading && lastError == null ? (
-        <div data-testid="plotly-figure-shell" style={styles.figureShell}>
-          <Plot
-            data={figure.data as unknown as Plotly.Data[]}
-            layout={figure.layout as unknown as Partial<Plotly.Layout>}
-            useResizeHandler
-            style={styles.figure}
-            config={{ responsive: true }}
-          />
-        </div>
-      ) : null}
+      <div data-testid="plotly-figure-shell" style={styles.figureShell}>
+        <div ref={plotRootRef} style={styles.figure} />
+        {isLoading ? (
+          <p role="status" style={styles.overlayStatus}>
+            Loading data...
+          </p>
+        ) : null}
+        {lastError != null ? (
+          <p role="alert" style={styles.overlayError}>
+            {lastError}
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -55,6 +167,7 @@ const styles: Record<string, CSSProperties> = {
     color: "#33536d"
   },
   figureShell: {
+    position: "relative",
     border: "1px dashed #95abc0",
     borderRadius: "10px",
     padding: "0.5rem",
@@ -64,5 +177,28 @@ const styles: Record<string, CSSProperties> = {
   figure: {
     width: "100%",
     height: "100%"
+  },
+  overlayStatus: {
+    position: "absolute",
+    top: "0.75rem",
+    right: "0.75rem",
+    margin: 0,
+    padding: "0.25rem 0.5rem",
+    borderRadius: "6px",
+    background: "rgba(30, 66, 98, 0.08)",
+    color: "#24435d",
+    fontSize: "0.85rem"
+  },
+  overlayError: {
+    position: "absolute",
+    left: "0.75rem",
+    bottom: "0.75rem",
+    margin: 0,
+    maxWidth: "calc(100% - 1.5rem)",
+    padding: "0.35rem 0.55rem",
+    borderRadius: "6px",
+    background: "rgba(152, 45, 45, 0.12)",
+    color: "#6b1d1d",
+    fontSize: "0.85rem"
   }
 };
