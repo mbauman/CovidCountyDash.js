@@ -56,7 +56,8 @@ describe("phase 3 controls parity", () => {
 
     expect(screen.getByTestId("selection-row-2")).toHaveAttribute("hidden");
 
-    await user.selectOptions(screen.getByTestId("state-select-1"), ["10"]);
+    await user.click(screen.getByLabelText("State row 1"));
+    await user.click(screen.getByText("State 10"));
     expect(screen.getByTestId("selection-row-2")).not.toHaveAttribute("hidden");
 
     await user.click(screen.getByRole("button", { name: "Reset Controls" }));
@@ -73,7 +74,7 @@ describe("phase 3 controls parity", () => {
     await user.click(screen.getByRole("button", { name: "All States & Territories" }));
     expect(screen.queryByTestId("state-menu-1")).not.toBeInTheDocument();
 
-    fireEvent.contextMenu(screen.getByLabelText("County row 1"));
+    fireEvent.contextMenu(screen.getByTestId("county-select-1"));
     expect(screen.getByTestId("county-menu-1")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Apply" }));

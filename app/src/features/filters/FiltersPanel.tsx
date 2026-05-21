@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import Select, { type MultiValue, type StylesConfig } from "react-select";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
   requestApplyPopulationWindow,
@@ -161,6 +162,42 @@ const CLOSED_MENU: MenuState = {
   y: 0
 };
 
+const multiSelectStyles: StylesConfig<Option, true> = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: "2.35rem",
+    borderColor: state.isFocused ? "#5685ad" : "#b8c7d4",
+    boxShadow: state.isFocused ? "0 0 0 1px #5685ad" : "none",
+    borderRadius: "8px",
+    backgroundColor: "#fff"
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    gap: "0.2rem"
+  }),
+  multiValue: (base) => ({
+    ...base,
+    backgroundColor: "#e8f1f9",
+    borderRadius: "6px"
+  }),
+  multiValueLabel: (base) => ({
+    ...base,
+    color: "#234058"
+  }),
+  multiValueRemove: (base) => ({
+    ...base,
+    color: "#234058",
+    ":hover": {
+      backgroundColor: "#cddfee",
+      color: "#11293c"
+    }
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 1100
+  })
+};
+
 function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Element {
   const dispatch = useAppDispatch();
   const [populationWindow, setPopulationWindow] = useState<[number, number]>([0, 100]);
@@ -174,6 +211,14 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
   const countyOptions = useMemo(
     () => selectCountyOptionsForStates(selection.stateFips),
     [selection.stateFips]
+  );
+  const selectedStateOptions = useMemo(
+    () => stateOptions.filter((option) => selection.stateFips.includes(option.value)),
+    [selection.stateFips, stateOptions]
+  );
+  const selectedCountyOptions = useMemo(
+    () => countyOptions.filter((option) => selection.countyFips.includes(option.value)),
+    [countyOptions, selection.countyFips]
   );
 
   useEffect(() => {
@@ -248,13 +293,10 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
         </button>
       </div>
 
-      <label style={styles.blockLabel}>
-        State
-        <select
-          aria-label={`State row ${rowIndex + 1}`}
+      <div style={styles.blockLabel}>
+        <span>State</span>
+        <div
           data-testid={`state-select-${rowIndex + 1}`}
-          multiple
-          value={selection.stateFips.map(String)}
           onContextMenu={(event) => {
             event.preventDefault();
             setCountyMenu(CLOSED_MENU);
@@ -264,38 +306,43 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
               y: event.clientY
             });
           }}
-          onChange={(event) => {
-            const selectedStateFips = [...event.target.selectedOptions].map((option) => Number(option.value));
-            const filteredCountyFips = selection.countyFips.filter((fips) =>
-              countyOptions.some((option) => option.value === fips)
-            );
-
-            dispatch(
-              setSelectionAtIndex({
-                index: rowIndex,
-                selection: {
-                  stateFips: selectedStateFips,
-                  countyFips: filteredCountyFips
-                }
-              })
-            );
-          }}
         >
-          {stateOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <Select<Option, true>
+            isMulti
+            isSearchable
+            closeMenuOnSelect={false}
+            hideSelectedOptions={false}
+            styles={multiSelectStyles}
+            options={stateOptions}
+            value={selectedStateOptions}
+            placeholder="Select or right click..."
+            aria-label={`State row ${rowIndex + 1}`}
+            noOptionsMessage={() => "No states found"}
+            onChange={(nextSelection: MultiValue<Option>) => {
+              const selectedStateFips = nextSelection.map((option) => option.value);
+              const nextCountyOptions = selectCountyOptionsForStates(selectedStateFips);
+              const filteredCountyFips = selection.countyFips.filter((fips) =>
+                nextCountyOptions.some((option) => option.value === fips)
+              );
 
-      <label style={styles.blockLabel}>
-        County
-        <select
-          aria-label={`County row ${rowIndex + 1}`}
-          multiple
-          value={selection.countyFips.map(String)}
-          disabled={selection.stateFips.length === 0}
+              dispatch(
+                setSelectionAtIndex({
+                  index: rowIndex,
+                  selection: {
+                    stateFips: selectedStateFips,
+                    countyFips: filteredCountyFips
+                  }
+                })
+              );
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={styles.blockLabel}>
+        <span>County</span>
+        <div
+          data-testid={`county-select-${rowIndex + 1}`}
           onContextMenu={(event) => {
             event.preventDefault();
             setStateMenu(CLOSED_MENU);
@@ -305,26 +352,34 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
               y: event.clientY
             });
           }}
-          onChange={(event) => {
-            const selectedCountyFips = [...event.target.selectedOptions].map((option) => Number(option.value));
-            dispatch(
-              setSelectionAtIndex({
-                index: rowIndex,
-                selection: {
-                  ...selection,
-                  countyFips: selectedCountyFips
-                }
-              })
-            );
-          }}
         >
-          {countyOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <Select<Option, true>
+            isMulti
+            isSearchable
+            closeMenuOnSelect={false}
+            hideSelectedOptions={false}
+            styles={multiSelectStyles}
+            options={countyOptions}
+            value={selectedCountyOptions}
+            isDisabled={selection.stateFips.length === 0}
+            placeholder="Select or right click..."
+            aria-label={`County row ${rowIndex + 1}`}
+            noOptionsMessage={() => "Select a state first"}
+            onChange={(nextSelection: MultiValue<Option>) => {
+              const selectedCountyFips = nextSelection.map((option) => option.value);
+              dispatch(
+                setSelectionAtIndex({
+                  index: rowIndex,
+                  selection: {
+                    ...selection,
+                    countyFips: selectedCountyFips
+                  }
+                })
+              );
+            }}
+          />
+        </div>
+      </div>
 
       {stateMenu.open ? (
         <div
@@ -451,55 +506,6 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
         </div>
       ) : null}
 
-      <fieldset style={styles.populationWindow}>
-        <legend>Population percentile window</legend>
-        <div style={styles.populationInputs}>
-          <label style={styles.inlineLabel}>
-            Min
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={populationWindow[0]}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                const bounded = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
-                setPopulationWindow([bounded, populationWindow[1]]);
-              }}
-            />
-          </label>
-          <label style={styles.inlineLabel}>
-            Max
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={populationWindow[1]}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                const bounded = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
-                setPopulationWindow([populationWindow[0], bounded]);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              dispatch(
-                requestApplyPopulationWindow({
-                  index: rowIndex,
-                  window: populationWindow
-                })
-              )
-            }
-            disabled={selection.stateFips.length === 0}
-          >
-            Apply Population Window
-          </button>
-        </div>
-      </fieldset>
     </div>
   );
 }
@@ -550,18 +556,6 @@ const styles: Record<string, CSSProperties> = {
     gap: "0.35rem",
     alignItems: "center",
     marginBottom: "0.6rem"
-  },
-  populationWindow: {
-    marginTop: "0.55rem",
-    border: "1px solid #d8dfcd",
-    borderRadius: "8px",
-    padding: "0.55rem"
-  },
-  populationInputs: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    alignItems: "end"
   },
   inlineLabel: {
     display: "grid",

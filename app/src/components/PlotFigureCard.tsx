@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import type * as Plotly from "plotly.js";
+import Plot from "react-plotly.js";
 import type { PlotlyFigure } from "../plotly/adapters";
 
 interface PlotFigureCardProps {
@@ -8,9 +10,6 @@ interface PlotFigureCardProps {
 }
 
 export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardProps): JSX.Element {
-  const traceCount = figure.data.length;
-  const pointCount = figure.data.reduce((count, trace) => count + (trace.y?.length ?? 0), 0);
-
   return (
     <section aria-label="Trend chart" style={styles.panel}>
       <div style={styles.panelHeader}>
@@ -23,10 +22,13 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
 
       {!isLoading && lastError == null ? (
         <div data-testid="plotly-figure-shell" style={styles.figureShell}>
-          <p>Traces: {traceCount}</p>
-          <p>Total plotted points: {pointCount}</p>
-          <p>Y axis: {figure.layout.yaxis?.title?.text ?? "Value"}</p>
-          <p>Scale: {figure.layout.yaxis?.type ?? "linear"}</p>
+          <Plot
+            data={figure.data as unknown as Plotly.Data[]}
+            layout={figure.layout as unknown as Partial<Plotly.Layout>}
+            useResizeHandler
+            style={styles.figure}
+            config={{ responsive: true }}
+          />
         </div>
       ) : null}
     </section>
@@ -55,7 +57,12 @@ const styles: Record<string, CSSProperties> = {
   figureShell: {
     border: "1px dashed #95abc0",
     borderRadius: "10px",
-    padding: "0.9rem",
-    background: "#ffffff"
+    padding: "0.5rem",
+    background: "#ffffff",
+    minHeight: "28rem"
+  },
+  figure: {
+    width: "100%",
+    height: "100%"
   }
 };
