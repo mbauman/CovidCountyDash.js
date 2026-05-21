@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { FilterState, GeographySelection, MetricType, ValueMode } from "../../domain/models";
 
+export type StateGroupName = "all" | "lower49" | "northeast" | "midwest" | "south" | "west";
+
 const blankSelection = (): GeographySelection => ({ stateFips: [], countyFips: [] });
 
 const initialState: FilterState = {
@@ -39,6 +41,20 @@ const filtersSlice = createSlice({
       action: PayloadAction<{ index: number; selection: GeographySelection }>
     ) {
       state.selections[action.payload.index] = action.payload.selection;
+    },
+    requestApplyStateGroup(
+      state,
+      action: PayloadAction<{ index: number; group: StateGroupName }>
+    ) {
+      void state;
+      void action;
+    },
+    requestApplyPopulationWindow(
+      state,
+      action: PayloadAction<{ index: number; window: [number, number] }>
+    ) {
+      void state;
+      void action;
     }
   }
 });
@@ -50,7 +66,9 @@ export const {
   setRollingDays,
   setNormalizeByPopulation,
   setUseLogScale,
-  setSelectionAtIndex
+  setSelectionAtIndex,
+  requestApplyStateGroup,
+  requestApplyPopulationWindow
 } = filtersSlice.actions;
 
 export default filtersSlice.reducer;

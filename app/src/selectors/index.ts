@@ -59,6 +59,7 @@ const EMPTY_CAVEAT_VISIBILITY: boolean[] = [false, false, false, false, false];
 
 export const selectFilters = (state: RootState) => state.filters;
 export const selectUi = (state: RootState) => state.ui;
+export const selectTransitionLog = (state: RootState) => state.ui.transitionLog ?? [];
 
 export const selectStateOptions = (state: RootState): SelectOption[] => {
   void state;
@@ -189,7 +190,7 @@ function deriveDateExtent(records: TransformRequest["records"]): [string, string
 }
 
 export const selectPrimaryPlotFigure = (state: RootState): PlotlyFigure => {
-  return selectPrimaryPlotFigureMemoized(state);
+  return state.ui.figure ?? selectPrimaryPlotFigureMemoized(state);
 };
 
 const selectPrimaryPlotFigureMemoized = createSelector(

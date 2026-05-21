@@ -2,18 +2,30 @@ import type {
   DailyRecord,
   PopulationRow,
   TransformRequest,
-  TransformSeries
+  TransformSeries,
+  TransformSeriesContract
 } from "../domain/covidData";
-import { buildSeries } from "./transforms";
+import { buildSeries, buildSeriesContract } from "./transforms";
 
 export interface DataServiceInput {
   request: TransformRequest;
+}
+
+export interface FetchSeriesContractInput {
+  request: TransformRequest;
+  location: string;
 }
 
 export type DataServiceResult = TransformSeries;
 
 export async function fetchSeries(input: DataServiceInput): Promise<DataServiceResult> {
   return buildSeries(input.request);
+}
+
+export async function fetchSeriesContract(
+  input: FetchSeriesContractInput
+): Promise<TransformSeriesContract> {
+  return buildSeriesContract(input.request, input.location);
 }
 
 export const EMPTY_RECORDS: DailyRecord[] = [];
