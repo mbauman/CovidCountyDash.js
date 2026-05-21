@@ -1,31 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { selectParityModeSummary } from "../selectors";
-import type { RootState } from "../app/store";
+import { render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { store } from "../app/store";
+import { App } from "../App";
 
-describe("phase 1 selectors", () => {
-  it("builds parity mode summary from filter state", () => {
-    const state = {
-      filters: {
-        metricType: "cases",
-        valueMode: "diff",
-        rollingDays: 7,
-        normalizeByPopulation: true,
-        useLogScale: false,
-        selections: [
-          { stateFips: [], countyFips: [] },
-          { stateFips: [], countyFips: [] },
-          { stateFips: [], countyFips: [] },
-          { stateFips: [], countyFips: [] },
-          { stateFips: [], countyFips: [] },
-          { stateFips: [], countyFips: [] }
-        ]
-      },
-      ui: {
-        isLoading: false,
-        lastError: null
-      }
-    } as RootState;
+describe("phase 3 app shell", () => {
+  it("renders dashboard title and core regions", () => {
+    render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    );
 
-    expect(selectParityModeSummary(state)).toContain("cases / daily / 7d roll");
+    expect(screen.getByRole("heading", { name: "Covid County Dash" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Filters" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Trend Overview" })).toBeInTheDocument();
   });
 });

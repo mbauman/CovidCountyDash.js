@@ -16,6 +16,9 @@ const filtersSlice = createSlice({
   name: "filters",
   initialState,
   reducers: {
+    resetFilters() {
+      return initialState;
+    },
     setMetricType(state, action: PayloadAction<MetricType>) {
       state.metricType = action.payload;
     },
@@ -41,6 +44,7 @@ const filtersSlice = createSlice({
 });
 
 export const {
+  resetFilters,
   setMetricType,
   setValueMode,
   setRollingDays,
