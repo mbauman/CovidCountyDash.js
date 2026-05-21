@@ -35,7 +35,7 @@ export interface DataSnapshot {
 }
 
 const COUNTIES_YEARS = ["2020", "2021", "2022"];
-const NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
+const DEFAULT_NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
 
 const SHORT_STATE: Record<number, string> = {
   1: "AL",
@@ -98,6 +98,15 @@ const SHORT_STATE: Record<number, string> = {
 
 let snapshotPromise: Promise<DataSnapshot> | null = null;
 let cachedSnapshot: DataSnapshot | null = null;
+
+function getNytRawBase(): string {
+  const configured = import.meta.env.VITE_NYT_RAW_BASE;
+  if (typeof configured !== "string" || configured.trim() === "") {
+    return DEFAULT_NYT_RAW_BASE;
+  }
+
+  return configured.replace(/\/+$/, "");
+}
 
 function isFixtureMode(): boolean {
   if (typeof process === "undefined") {
@@ -345,16 +354,17 @@ function makeFixtureSnapshot(): DataSnapshot {
 }
 
 async function makeRealSnapshot(): Promise<DataSnapshot> {
+  const nytRawBase = getNytRawBase();
   const { population, stateNamesByFips, countyNamesByFips, stateOptions } = parsePopulation(populationCsvText);
   const stateFipsByName = new Map<string, number>(
     [...stateNamesByFips.entries()].map(([fips, stateName]) => [stateName, fips])
   );
 
-  const statesCsv = await fetchText(`${NYT_RAW_BASE}/us-states.csv`);
+  const statesCsv = await fetchText(`${nytRawBase}/us-states.csv`);
   const statesRows = parseNytRows(statesCsv, false);
 
   const countyCsvByYear = await Promise.all(
-    COUNTIES_YEARS.map((year) => fetchText(`${NYT_RAW_BASE}/us-counties-${year}.csv`))
+    COUNTIES_YEARS.map((year) => fetchText(`${nytRawBase}/us-counties-${year}.csv`))
   );
   const countyRows = countyCsvByYear.flatMap((csvText) => parseNytRows(csvText, true));
 
