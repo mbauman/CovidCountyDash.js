@@ -19,6 +19,20 @@ export async function fetchSeries(input: DataServiceInput): Promise<DataServiceR
 export const EMPTY_RECORDS: DailyRecord[] = [];
 export const EMPTY_POPULATION: PopulationRow[] = [];
 
+export const PHASE2_BASELINE_RECORDS: DailyRecord[] = [
+  { date: "2020-01-01", fips: 10, cases: 10, deaths: 1 },
+  { date: "2020-01-01", fips: 20, cases: 5, deaths: 0 },
+  { date: "2020-01-02", fips: 10, cases: 20, deaths: 2 },
+  { date: "2020-01-02", fips: 20, cases: 9, deaths: 1 },
+  { date: "2020-01-03", fips: 10, cases: 35, deaths: 4 },
+  { date: "2020-01-03", fips: 20, cases: 15, deaths: 2 }
+];
+
+export const PHASE2_BASELINE_POPULATION: PopulationRow[] = [
+  { fips: 10, pop: 1000 },
+  { fips: 20, pop: 500 }
+];
+
 export function createEmptyTransformRequest(): TransformRequest {
   return {
     records: EMPTY_RECORDS,

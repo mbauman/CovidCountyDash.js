@@ -81,3 +81,65 @@ export function toPlotlyFigureFromContract(
     }
   };
 }
+
+export function toPlotlyFigureFromContracts(
+  seriesContracts: TransformSeriesContract[],
+  metadata: TransformPlotMetadata,
+  dateExtent: [string, string] | null
+): PlotlyFigure {
+  if (seriesContracts.length === 0 || seriesContracts.every((series) => series.dates.length === 0)) {
+    const placeholderX = dateExtent == null ? [] : [dateExtent[0], dateExtent[1]];
+    const placeholderY = dateExtent == null ? [] : [Number.NaN, Number.NaN];
+
+    return {
+      data: [
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "",
+          x: placeholderX,
+          y: placeholderY
+        }
+      ],
+      layout: {
+        title: { text: metadata.title },
+        xaxis: { title: { text: "Date" } },
+        yaxis: {
+          title: { text: metadata.yAxisTitle },
+          type: metadata.yAxisType,
+          ticksuffix: metadata.yAxisTickSuffix
+        }
+      }
+    };
+  }
+
+  const data = seriesContracts
+    .filter((series) => series.dates.length > 0)
+    .map((series) => {
+      const y = metadata.valueField === "y" ? series.values : series.popvalues;
+      const customdata = metadata.popField === "customdata" ? series.popvalues : series.values;
+
+      return {
+        type: "scatter",
+        mode: "lines",
+        name: series.location,
+        x: series.dates,
+        y,
+        customdata,
+        hovertemplate: metadata.hoverTemplate
+      };
+    });
+
+  return {
+    data,
+    layout: {
+      title: { text: metadata.title },
+      xaxis: { title: { text: "Date" } },
+      yaxis: {
+        title: { text: metadata.yAxisTitle },
+        type: metadata.yAxisType,
+        ticksuffix: metadata.yAxisTickSuffix
+      }
+    }
+  };
+}
