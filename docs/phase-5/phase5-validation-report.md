@@ -39,7 +39,7 @@ Scope: Release-1 parity validation and hardening against Phase 0 baseline artifa
 | Baseline scenario A figure signature | Automated | `phase5-parity-hardening.test.ts` | Pass |
 | Baseline scenario B exact numeric series parity | Automated | `phase5-real-data-parity.test.ts` | Pass |
 | Baseline scenario C NYC cumulative deaths exact numeric parity | Automated | `phase5-real-data-parity.test.ts` | Pass |
-| Right-click Dash jsloader side-effect parity | Manual/behavioral | Not ported one-to-one by design | Accepted deviation |
+| Right-click Dash jsloader side-effect parity | Automated/manual | `phase3-layout.test.tsx`, right-click menu implementation in `FiltersPanel.tsx` | Pass (functional parity) |
 
 ## 3. Visual and Performance Validation Evidence
 
@@ -106,9 +106,6 @@ Scope: Release-1 parity validation and hardening against Phase 0 baseline artifa
   - callback sequencing and stale-response handling: `app/src/test/phase4-event-flow.test.ts`
 
 ## 6. Remaining Release Risks
-- Risk: Dash context-menu side-effect not ported one-to-one (owner: product/parity triage).
-  - Impact: interaction parity gap for right-click behavior.
-  - Next step: decide whether to implement custom context-menu UX or classify as non-blocking deviation.
 - Risk: No pixel-level screenshot diff workflow (owner: QA/parity).
   - Impact: only functional visual parity currently asserted.
   - Next step: capture canonical screenshot baselines and add image diff automation.
@@ -119,7 +116,7 @@ Scope: Release-1 parity validation and hardening against Phase 0 baseline artifa
 - [x] Performance and memory safeguards are executed and recorded.
 - [x] Build/typecheck/test evidence captured.
 - [x] Full numeric parity versus Julia baseline scenarios B/C.
-- [ ] Right-click context-menu parity disposition finalized (implement or accept explicit deviation).
+- [x] Right-click context-menu parity disposition finalized (implemented with custom context menus and tested).
 - [ ] Pixel-level visual diff baseline and thresholds established.
 
-Phase 5 conclusion: **Partially ready for Phase 6**. Numeric parity for baseline scenarios B/C is now complete and verified; remaining signoff gaps are right-click parity disposition and pixel-level visual diff workflow.
+Phase 5 conclusion: **Partially ready for Phase 6**. Numeric and interaction parity targets are complete and verified; remaining signoff gap is pixel-level visual diff workflow.
