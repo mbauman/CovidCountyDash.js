@@ -2,7 +2,13 @@ import type { RootState } from "../app/store";
 import { createSelector } from "@reduxjs/toolkit";
 import type { TransformDisplayOptions, TransformRequest } from "../domain/covidData";
 import { toPlotlyFigureFromContracts, type PlotlyFigure } from "../plotly/adapters";
-import { PHASE2_BASELINE_POPULATION, PHASE2_BASELINE_RECORDS } from "../services/dataService";
+import {
+  buildSelectionLabel,
+  getCachedDataSnapshot,
+  getCountyOptionsForStates,
+  PHASE2_BASELINE_POPULATION,
+  PHASE2_BASELINE_RECORDS
+} from "../services/dataService";
 import { buildPlotMetadata, buildSeriesContract } from "../services/transforms";
 
 export interface SelectOption {
@@ -21,29 +27,6 @@ const JOPLIN_MO_FIPS = 29997;
 const UNKNOWN_STATE_10_FIPS = 10999;
 const UNKNOWN_STATE_20_FIPS = 20999;
 
-function deriveStateFips(fips: number): number {
-  return fips < 1000 ? fips : Math.floor(fips / 1000);
-}
-
-const COUNTY_OPTIONS: SelectOption[] = [...new Set(PHASE2_BASELINE_RECORDS.map((record) => record.fips))]
-  .sort((left, right) => left - right)
-  .map((fips) => ({ value: fips, label: `County ${fips}` }));
-
-const STATE_OPTIONS: SelectOption[] = [...new Set(COUNTY_OPTIONS.map((option) => deriveStateFips(option.value)))]
-  .sort((left, right) => left - right)
-  .map((stateFips) => ({ value: stateFips, label: `State ${stateFips}` }));
-
-const DATE_RANGE: [string | null, string | null] = (() => {
-  if (PHASE2_BASELINE_RECORDS.length === 0) {
-    return [null, null];
-  }
-
-  const dates = PHASE2_BASELINE_RECORDS
-    .map((record) => record.date)
-    .sort((left, right) => left.localeCompare(right));
-  return [dates[0] ?? null, dates[dates.length - 1] ?? null];
-})();
-
 const VALUE_MODE_OPTIONS_CASES: ValueModeOption[] = [
   { value: "diff", label: "New daily cases" },
   { value: "values", label: "Cumulative totals" }
@@ -54,24 +37,33 @@ const VALUE_MODE_OPTIONS_DEATHS: ValueModeOption[] = [
   { value: "values", label: "Cumulative totals" }
 ];
 
-const EMPTY_OPTIONS: SelectOption[] = [];
 const EMPTY_CAVEAT_VISIBILITY: boolean[] = [false, false, false, false, false];
+const EMPTY_DATE_RANGE: [string | null, string | null] = [null, null];
+const FALLBACK_STATE_OPTIONS: SelectOption[] = [
+  { value: 10, label: "State 10" },
+  { value: 20, label: "State 20" }
+];
+const FALLBACK_COUNTY_OPTIONS: SelectOption[] = [
+  { value: 10, label: "County 10" },
+  { value: 20, label: "County 20" }
+];
 
 export const selectFilters = (state: RootState) => state.filters;
 export const selectUi = (state: RootState) => state.ui;
 export const selectTransitionLog = (state: RootState) => state.ui.transitionLog ?? [];
 
 export const selectStateOptions = (state: RootState): SelectOption[] => {
-  void state;
-  return STATE_OPTIONS;
+  void state.ui.dataVersion;
+  return getCachedDataSnapshot()?.stateOptions ?? FALLBACK_STATE_OPTIONS;
 };
 
 export const selectCountyOptionsForStates = (selectedStateFips: number[]): SelectOption[] => {
-  if (selectedStateFips.length === 0) {
-    return EMPTY_OPTIONS;
+  const snapshot = getCachedDataSnapshot();
+  if (snapshot == null) {
+    return FALLBACK_COUNTY_OPTIONS.filter((option) => selectedStateFips.includes(option.value));
   }
 
-  return COUNTY_OPTIONS.filter((option) => selectedStateFips.includes(deriveStateFips(option.value)));
+  return getCountyOptionsForStates(selectedStateFips, snapshot);
 };
 
 export const selectCountyOptionsForRow = (state: RootState, rowIndex: number): SelectOption[] => {
@@ -96,10 +88,16 @@ export const selectValueModeOptions = (state: RootState): ValueModeOption[] => {
   return state.filters.metricType === "cases" ? VALUE_MODE_OPTIONS_CASES : VALUE_MODE_OPTIONS_DEATHS;
 };
 
-export const selectDateRange = (state: RootState): [string | null, string | null] => {
-  void state;
-  return DATE_RANGE;
-};
+export const selectDateRange = createSelector(
+  (state: RootState) => state.ui.dataStartDate,
+  (state: RootState) => state.ui.dataEndDate,
+  (startDate, endDate): [string | null, string | null] => {
+    if (startDate == null && endDate == null) {
+      return EMPTY_DATE_RANGE;
+    }
+    return [startDate ?? null, endDate ?? null];
+  }
+);
 
 export const selectLoadedThroughDate = (state: RootState): string | null => {
   const [, endDate] = selectDateRange(state);
@@ -123,7 +121,11 @@ export const selectCaveatVisibility = createSelector(
       selectedCountyFips.has(JOPLIN_MO_FIPS),
       selectedCountyFips.has(UNKNOWN_STATE_10_FIPS) || selectedCountyFips.has(UNKNOWN_STATE_20_FIPS),
       selectedCountyFips.size > 0 &&
-        [...selectedCountyFips].some((fips) => !PHASE2_BASELINE_POPULATION.some((row) => row.fips === fips))
+        [...selectedCountyFips].some((fips) => {
+          const snapshot = getCachedDataSnapshot();
+          const population = snapshot?.population ?? PHASE2_BASELINE_POPULATION;
+          return !population.some((row) => row.fips === fips);
+        })
     ];
   }
 );
@@ -169,10 +171,11 @@ export const selectSelectedFips = (state: RootState): number[] => {
 
 export const selectPrimaryTransformRequest = (state: RootState): TransformRequest => {
   const { metricType, valueMode, rollingDays, normalizeByPopulation } = state.filters;
+  const snapshot = getCachedDataSnapshot();
   return {
-    records: PHASE2_BASELINE_RECORDS,
+    records: snapshot?.records ?? PHASE2_BASELINE_RECORDS,
     selectedFips: selectSelectedFips(state),
-    population: PHASE2_BASELINE_POPULATION,
+    population: snapshot?.population ?? PHASE2_BASELINE_POPULATION,
     metricType,
     valueMode,
     rollingDays,
@@ -186,7 +189,9 @@ function deriveDateExtent(records: TransformRequest["records"]): [string, string
   }
 
   const dates = records.map((record) => record.date).sort((left, right) => left.localeCompare(right));
-  return [dates[0], dates[dates.length - 1]];
+  const start = dates[0];
+  const end = dates[dates.length - 1];
+  return start == null || end == null ? null : [start, end];
 }
 
 export const selectPrimaryPlotFigure = (state: RootState): PlotlyFigure => {
@@ -196,6 +201,10 @@ export const selectPrimaryPlotFigure = (state: RootState): PlotlyFigure => {
 const selectPrimaryPlotFigureMemoized = createSelector(
   (state: RootState) => state.filters,
   (filters): PlotlyFigure => {
+    const snapshot = getCachedDataSnapshot();
+    const records = snapshot?.records ?? PHASE2_BASELINE_RECORDS;
+    const population = snapshot?.population ?? PHASE2_BASELINE_POPULATION;
+
     const display = {
       metricType: filters.metricType,
       valueMode: filters.valueMode,
@@ -205,9 +214,9 @@ const selectPrimaryPlotFigureMemoized = createSelector(
     } as TransformDisplayOptions;
 
     const baseRequest: TransformRequest = {
-      records: PHASE2_BASELINE_RECORDS,
+      records,
       selectedFips: [],
-      population: PHASE2_BASELINE_POPULATION,
+      population,
       metricType: filters.metricType,
       valueMode: filters.valueMode,
       rollingDays: filters.rollingDays,
@@ -226,12 +235,16 @@ const selectPrimaryPlotFigureMemoized = createSelector(
           selectedFips: [...selectionFips]
         };
 
-        return buildSeriesContract(request, `Selection ${index + 1}`);
+        const label = snapshot == null
+          ? `Selection ${index + 1}`
+          : buildSelectionLabel(selectionFips, snapshot) || `Selection ${index + 1}`;
+
+        return buildSeriesContract(request, label);
       })
       .filter((series): series is NonNullable<typeof series> => series != null);
 
     const metadata = buildPlotMetadata(display);
-    return toPlotlyFigureFromContracts(seriesContracts, metadata, deriveDateExtent(baseRequest.records));
+    return toPlotlyFigureFromContracts(seriesContracts, metadata, deriveDateExtent(records));
   }
 );
 

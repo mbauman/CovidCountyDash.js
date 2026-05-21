@@ -37,6 +37,9 @@ describe("phase 4 callback event flow", () => {
       }
     });
 
+    const initialCalls = fetchSeriesContractFn.mock.calls.length;
+    const initialPending = pending.length;
+
     store.dispatch(
       setSelectionAtIndex({
         index: 0,
@@ -52,16 +55,20 @@ describe("phase 4 callback event flow", () => {
     );
 
     await waitFor(() => {
-      expect(fetchSeriesContractFn).toHaveBeenCalledTimes(2);
-      expect(pending).toHaveLength(2);
+      expect(fetchSeriesContractFn.mock.calls.length - initialCalls).toBe(2);
+      expect(pending.length - initialPending).toBe(2);
     });
 
-    pending[1](makeContract("Selection 1", 20));
+    const latestResolve = pending[initialPending + 1];
+    expect(latestResolve).toBeDefined();
+    latestResolve?.(makeContract("Selection 1", 20));
     await waitFor(() => {
       expect(store.getState().ui.committedRequestId).toBe(3);
     });
 
-    pending[0](makeContract("Selection 1", 10));
+    const staleResolve = pending[initialPending];
+    expect(staleResolve).toBeDefined();
+    staleResolve?.(makeContract("Selection 1", 10));
     await waitFor(() => {
       const staleEvent = (store.getState().ui.transitionLog ?? []).find(
         (event) => event.requestId === 2 && event.stage === "stale"

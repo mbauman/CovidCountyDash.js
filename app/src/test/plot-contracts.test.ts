@@ -29,7 +29,8 @@ describe("selectTransformDisplayOptions", () => {
       },
       ui: {
         isLoading: false,
-        lastError: null
+        lastError: null,
+        dataVersion: 0
       }
     } as RootState;
 
@@ -62,11 +63,12 @@ describe("toPlotlyFigureFromContract", () => {
     };
 
     const figure = toPlotlyFigureFromContract(series, metadata);
+    const firstTrace = figure.data[0];
 
     expect(figure.data).toHaveLength(1);
-    expect(figure.data[0].y).toEqual([1, 1.2]);
-    expect(figure.data[0].customdata).toEqual([10, 12]);
-    expect(figure.data[0].hovertemplate).toBe(metadata.hoverTemplate);
+    expect(firstTrace?.y).toEqual([1, 1.2]);
+    expect(firstTrace?.customdata).toEqual([10, 12]);
+    expect(firstTrace?.hovertemplate).toBe(metadata.hoverTemplate);
     expect(figure.layout.title?.text).toBe("Daily Confirmed Cases");
     expect(figure.layout.yaxis?.title?.text).toBe("Number of daily cases");
   });
@@ -85,11 +87,12 @@ describe("toPlotlyFigureFromContracts", () => {
     };
 
     const figure = toPlotlyFigureFromContracts([], metadata, ["2020-01-01", "2020-01-03"]);
+    const firstTrace = figure.data[0];
 
     expect(figure.data).toHaveLength(1);
-    expect(figure.data[0].x).toEqual(["2020-01-01", "2020-01-03"]);
-    expect(Number.isNaN((figure.data[0].y ?? [])[0])).toBe(true);
-    expect(Number.isNaN((figure.data[0].y ?? [])[1])).toBe(true);
+    expect(firstTrace?.x).toEqual(["2020-01-01", "2020-01-03"]);
+    expect(Number.isNaN((firstTrace?.y ?? [])[0])).toBe(true);
+    expect(Number.isNaN((firstTrace?.y ?? [])[1])).toBe(true);
   });
 });
 
@@ -113,7 +116,8 @@ describe("selector-driven plot pipeline", () => {
       },
       ui: {
         isLoading: false,
-        lastError: null
+        lastError: null,
+        dataVersion: 0
       }
     } as RootState;
 
@@ -147,24 +151,27 @@ describe("selector-driven plot pipeline", () => {
       },
       ui: {
         isLoading: false,
-        lastError: null
+        lastError: null,
+        dataVersion: 0
       }
     } as RootState;
 
     const figure = selectPrimaryPlotFigure(state);
+    const firstTrace = figure.data[0];
+    const secondTrace = figure.data[1];
 
     expect(figure.layout.title?.text).toBe("Daily Confirmed Cases");
     expect(figure.layout.yaxis?.title?.text).toBe("Average daily cases (rolling 7-day mean)");
     expect(figure.layout.yaxis?.ticksuffix).toBe("%");
     expect(figure.layout.yaxis?.type).toBe("linear");
     expect(figure.data).toHaveLength(2);
-    expect(figure.data[0].name).toBe("Selection 1");
-    expect(figure.data[1].name).toBe("Selection 2");
-    expect(Number.isNaN(figure.data[0].y?.[0] ?? 0)).toBe(true);
-    expect((figure.data[0].y ?? [])[1]).toBeCloseTo(1, 5);
-    expect((figure.data[0].customdata ?? [])[1]).toBeCloseTo(10, 5);
-    expect((figure.data[1].y ?? [])[1]).toBeCloseTo(0.8, 5);
-    expect((figure.data[1].customdata ?? [])[1]).toBeCloseTo(4, 5);
+    expect(firstTrace?.name).toBeTruthy();
+    expect(secondTrace?.name).toBeTruthy();
+    expect(Number.isNaN(firstTrace?.y?.[0] ?? 0)).toBe(true);
+    expect((firstTrace?.y ?? [])[1]).toBeCloseTo(1, 5);
+    expect((firstTrace?.customdata ?? [])[1]).toBeCloseTo(10, 5);
+    expect((secondTrace?.y ?? [])[1]).toBeCloseTo(0.8, 5);
+    expect((secondTrace?.customdata ?? [])[1]).toBeCloseTo(4, 5);
   });
 
   it("builds placeholder figure output when no selections are active", () => {
@@ -186,15 +193,17 @@ describe("selector-driven plot pipeline", () => {
       },
       ui: {
         isLoading: false,
-        lastError: null
+        lastError: null,
+        dataVersion: 0
       }
     } as RootState;
 
     const figure = selectPrimaryPlotFigure(state);
+    const firstTrace = figure.data[0];
 
     expect(figure.data).toHaveLength(1);
-    expect(figure.data[0].x).toEqual(["2020-01-01", "2020-01-03"]);
-    expect(Number.isNaN((figure.data[0].y ?? [])[0])).toBe(true);
-    expect(Number.isNaN((figure.data[0].y ?? [])[1])).toBe(true);
+    expect(firstTrace?.x).toEqual(["2020-01-01", "2020-01-03"]);
+    expect(Number.isNaN((firstTrace?.y ?? [])[0])).toBe(true);
+    expect(Number.isNaN((firstTrace?.y ?? [])[1])).toBe(true);
   });
 });

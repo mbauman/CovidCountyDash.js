@@ -185,7 +185,9 @@ function difference(values: number[]): number[] {
 
   const result: number[] = [];
   for (let index = 1; index < values.length; index += 1) {
-    result.push(values[index] - values[index - 1]);
+    const current = values[index] ?? 0;
+    const previous = values[index - 1] ?? 0;
+    result.push(current - previous);
   }
   return result;
 }

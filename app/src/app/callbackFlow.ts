@@ -1,4 +1,4 @@
-import { createListenerMiddleware, isAnyOf, type ListenerMiddleware } from "@reduxjs/toolkit";
+import { createListenerMiddleware, isAnyOf } from "@reduxjs/toolkit";
 import {
   requestApplyPopulationWindow,
   requestApplyStateGroup,
@@ -17,14 +17,17 @@ import {
   callbackTransitionIgnored,
   callbackTransitionStarted,
   callbackTransitionCommitted,
+  dataSnapshotReady,
   requestFigureRefresh,
   type UiTransitionStage
 } from "../features/ui/uiSlice";
 import {
+  buildSelectionLabel,
+  type DataSnapshot,
   type FetchSeriesContractInput,
   fetchSeriesContract,
-  PHASE2_BASELINE_POPULATION,
-  PHASE2_BASELINE_RECORDS
+  getCountyOptionsForStates,
+  loadDataSnapshot
 } from "../services/dataService";
 import { toPlotlyFigureFromContracts } from "../plotly/adapters";
 import { buildPlotMetadata } from "../services/transforms";
@@ -42,6 +45,7 @@ export interface CallbackTraceEvent {
 
 export interface CallbackFlowDependencies {
   fetchSeriesContractFn?: (input: FetchSeriesContractInput) => Promise<Awaited<ReturnType<typeof fetchSeriesContract>>>;
+  getDataSnapshotFn?: () => Promise<DataSnapshot>;
   trace?: (event: CallbackTraceEvent) => void;
 }
 
@@ -55,7 +59,7 @@ const DEFAULT_TRACE = (event: CallbackTraceEvent): void => {
   }
 };
 
-function deriveDateExtent(records: typeof PHASE2_BASELINE_RECORDS): [string, string] | null {
+function deriveDateExtent(records: DataSnapshot["records"]): [string, string] | null {
   if (records.length === 0) {
     return null;
   }
@@ -81,16 +85,16 @@ function deriveStateFips(fips: number): number {
   return fips < 1000 ? fips : Math.floor(fips / 1000);
 }
 
-function getAvailableStateFips(): number[] {
+function getAvailableStateFips(snapshot: DataSnapshot): number[] {
   const states = new Set<number>();
-  for (const record of PHASE2_BASELINE_RECORDS) {
+  for (const record of snapshot.records) {
     states.add(deriveStateFips(record.fips));
   }
   return [...states].sort((left, right) => left - right);
 }
 
-function selectStatesForGroup(group: StateGroupName): number[] {
-  const availableStates = getAvailableStateFips();
+function selectStatesForGroup(group: StateGroupName, snapshot: DataSnapshot): number[] {
+  const availableStates = getAvailableStateFips(snapshot);
   switch (group) {
     case "all":
       return availableStates;
@@ -109,28 +113,24 @@ function selectStatesForGroup(group: StateGroupName): number[] {
   }
 }
 
-function getCountyOptionsForStates(stateFips: number[]): number[] {
+function getCountyFipsForStates(stateFips: number[], snapshot: DataSnapshot): number[] {
   if (stateFips.length === 0) {
     return [];
   }
 
-  const states = new Set(stateFips);
-  const counties = new Set<number>();
-  for (const record of PHASE2_BASELINE_RECORDS) {
-    if (states.has(deriveStateFips(record.fips))) {
-      counties.add(record.fips);
-    }
-  }
-
-  return [...counties].sort((left, right) => left - right);
+  return getCountyOptionsForStates(stateFips, snapshot).map((option) => option.value);
 }
 
-function applyPopulationWindow(counties: number[], window: [number, number]): number[] {
+function applyPopulationWindow(
+  counties: number[],
+  window: [number, number],
+  snapshot: DataSnapshot
+): number[] {
   if (counties.length === 0) {
     return [];
   }
 
-  const populationMap = new Map(PHASE2_BASELINE_POPULATION.map((row) => [row.fips, row.pop ?? 0]));
+  const populationMap = new Map(snapshot.population.map((row) => [row.fips, row.pop ?? 0]));
   const ranked = [...counties]
     .map((fips) => ({ fips, pop: populationMap.get(fips) ?? 0 }))
     .sort((left, right) => left.pop - right.pop);
@@ -141,7 +141,7 @@ function applyPopulationWindow(counties: number[], window: [number, number]): nu
   const denom = ranked.length > 1 ? ranked.length - 1 : 1;
 
   return ranked
-    .filter((entry, index) => {
+    .filter((_, index) => {
       const percentile = (index / denom) * 100;
       return percentile >= min && percentile <= max;
     })
@@ -151,8 +151,9 @@ function applyPopulationWindow(counties: number[], window: [number, number]): nu
 
 export function createCallbackFlowListener(
   dependencies: CallbackFlowDependencies = {}
-): ListenerMiddleware {
+) {
   const fetchSeriesContractFn = dependencies.fetchSeriesContractFn ?? fetchSeriesContract;
+  const getDataSnapshotFn = dependencies.getDataSnapshotFn ?? loadDataSnapshot;
   const trace = dependencies.trace ?? DEFAULT_TRACE;
   const listenerMiddleware = createListenerMiddleware();
 
@@ -160,15 +161,16 @@ export function createCallbackFlowListener(
 
   listenerMiddleware.startListening({
     actionCreator: requestApplyStateGroup,
-    effect: (action, api): void => {
+    effect: async (action, api): Promise<void> => {
+      const snapshot = await getDataSnapshotFn();
       const state = api.getState() as RootState;
       const existing = state.filters.selections[action.payload.index];
       if (existing == null) {
         return;
       }
 
-      const nextStateFips = selectStatesForGroup(action.payload.group);
-      const countyOptions = getCountyOptionsForStates(nextStateFips);
+      const nextStateFips = selectStatesForGroup(action.payload.group, snapshot);
+      const countyOptions = getCountyFipsForStates(nextStateFips, snapshot);
       const nextCountyFips = existing.countyFips.filter((fips) => countyOptions.includes(fips));
 
       api.dispatch(
@@ -185,15 +187,16 @@ export function createCallbackFlowListener(
 
   listenerMiddleware.startListening({
     actionCreator: requestApplyPopulationWindow,
-    effect: (action, api): void => {
+    effect: async (action, api): Promise<void> => {
+      const snapshot = await getDataSnapshotFn();
       const state = api.getState() as RootState;
       const existing = state.filters.selections[action.payload.index];
       if (existing == null) {
         return;
       }
 
-      const countyOptions = getCountyOptionsForStates(existing.stateFips);
-      const nextCountyFips = applyPopulationWindow(countyOptions, action.payload.window);
+      const countyOptions = getCountyFipsForStates(existing.stateFips, snapshot);
+      const nextCountyFips = applyPopulationWindow(countyOptions, action.payload.window, snapshot);
 
       api.dispatch(
         setSelectionAtIndex({
@@ -223,8 +226,8 @@ export function createCallbackFlowListener(
       const requestId = latestRequestId + 1;
       latestRequestId = requestId;
 
-      const state = api.getState() as RootState;
-      const selectedFipsCount = state.filters.selections.reduce((count, selection) => {
+      const stateAtDispatch = api.getState() as RootState;
+      const selectedFipsCount = stateAtDispatch.filters.selections.reduce((count, selection) => {
         const activeFips = selection.countyFips.length > 0 ? selection.countyFips : selection.stateFips;
         return count + activeFips.length;
       }, 0);
@@ -239,14 +242,22 @@ export function createCallbackFlowListener(
       traceEvent(trace, { stage: "start", requestId, trigger, selectedFipsCount });
 
       const display = {
-        metricType: state.filters.metricType,
-        valueMode: state.filters.valueMode,
-        rollingDays: state.filters.rollingDays,
-        normalizeByPopulation: state.filters.normalizeByPopulation,
-        useLogScale: state.filters.useLogScale
+        metricType: stateAtDispatch.filters.metricType,
+        valueMode: stateAtDispatch.filters.valueMode,
+        rollingDays: stateAtDispatch.filters.rollingDays,
+        normalizeByPopulation: stateAtDispatch.filters.normalizeByPopulation,
+        useLogScale: stateAtDispatch.filters.useLogScale
       };
 
-      const workItems = state.filters.selections
+      const snapshot = await getDataSnapshotFn();
+      api.dispatch(
+        dataSnapshotReady({
+          startDate: snapshot.dateRange[0],
+          endDate: snapshot.dateRange[1]
+        })
+      );
+
+      const workItems = stateAtDispatch.filters.selections
         .map((selection, index) => {
           const selectedFips = selection.countyFips.length > 0 ? selection.countyFips : selection.stateFips;
           if (selectedFips.length === 0) {
@@ -255,15 +266,15 @@ export function createCallbackFlowListener(
 
           return {
             request: {
-              records: PHASE2_BASELINE_RECORDS,
+              records: snapshot.records,
               selectedFips: [...selectedFips],
-              population: PHASE2_BASELINE_POPULATION,
-              metricType: state.filters.metricType,
-              valueMode: state.filters.valueMode,
-              rollingDays: state.filters.rollingDays,
-              normalizeByPopulation: state.filters.normalizeByPopulation
+              population: snapshot.population,
+              metricType: stateAtDispatch.filters.metricType,
+              valueMode: stateAtDispatch.filters.valueMode,
+              rollingDays: stateAtDispatch.filters.rollingDays,
+              normalizeByPopulation: stateAtDispatch.filters.normalizeByPopulation
             },
-            location: `Selection ${index + 1}`
+            location: buildSelectionLabel(selectedFips, snapshot) || `Selection ${index + 1}`
           };
         })
         .filter((item): item is { request: FetchSeriesContractInput["request"]; location: string } => item != null);
@@ -299,7 +310,7 @@ export function createCallbackFlowListener(
         const figure = toPlotlyFigureFromContracts(
           contracts,
           metadata,
-          deriveDateExtent(PHASE2_BASELINE_RECORDS)
+          deriveDateExtent(snapshot.records)
         );
 
         api.dispatch(

@@ -15,13 +15,16 @@ export interface UiTransitionEvent {
 }
 
 interface UiState {
-  isLoading: false,
+  isLoading: boolean;
   lastError: null
     | string;
   figure?: PlotlyFigure;
   activeRequestId?: number;
   committedRequestId?: number;
   transitionLog?: UiTransitionEvent[];
+  dataStartDate?: string | null;
+  dataEndDate?: string | null;
+  dataVersion: number;
 }
 
 const initialState: UiState = {
@@ -29,7 +32,10 @@ const initialState: UiState = {
   lastError: null,
   activeRequestId: 0,
   committedRequestId: 0,
-  transitionLog: []
+  transitionLog: [],
+  dataStartDate: null,
+  dataEndDate: null,
+  dataVersion: 0
 };
 
 function appendTransition(state: UiState, event: UiTransitionEvent): void {
@@ -43,6 +49,14 @@ const uiSlice = createSlice({
   reducers: {
     requestFigureRefresh(state) {
       state.lastError = null;
+    },
+    dataSnapshotReady(
+      state,
+      action: PayloadAction<{ startDate: string | null; endDate: string | null }>
+    ) {
+      state.dataStartDate = action.payload.startDate;
+      state.dataEndDate = action.payload.endDate;
+      state.dataVersion += 1;
     },
     setIsLoading(state, action: PayloadAction<boolean>) {
       state.isLoading = action.payload;
@@ -136,6 +150,7 @@ const uiSlice = createSlice({
 
 export const {
   requestFigureRefresh,
+  dataSnapshotReady,
   setIsLoading,
   setLastError,
   callbackTransitionStarted,
