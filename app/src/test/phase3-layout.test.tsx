@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import filtersReducer from "../features/filters/filtersSlice";
@@ -61,5 +61,22 @@ describe("phase 3 controls parity", () => {
 
     await user.click(screen.getByRole("button", { name: "Reset Controls" }));
     expect(screen.getByTestId("selection-row-2")).toHaveAttribute("hidden");
+  });
+
+  it("opens and closes right-click state and county menus", async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    fireEvent.contextMenu(screen.getByTestId("state-select-1"));
+    expect(screen.getByTestId("state-menu-1")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "All States & Territories" }));
+    expect(screen.queryByTestId("state-menu-1")).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(screen.getByLabelText("County row 1"));
+    expect(screen.getByTestId("county-menu-1")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(screen.queryByTestId("county-menu-1")).not.toBeInTheDocument();
   });
 });
