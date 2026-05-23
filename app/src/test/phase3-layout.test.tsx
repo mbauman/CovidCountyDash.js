@@ -68,14 +68,22 @@ describe("phase 3 controls parity", () => {
     const user = userEvent.setup();
     renderApp();
 
-    fireEvent.contextMenu(screen.getByTestId("state-select-1"));
+    const stateSelect = screen.getByTestId("state-select-1");
+    fireEvent.pointerDown(stateSelect, { button: 2, pointerType: "mouse" });
+    fireEvent.mouseDown(stateSelect, { button: 2 });
+    fireEvent.contextMenu(stateSelect);
     expect(screen.getByTestId("state-menu-1")).toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "All States & Territories" }));
     expect(screen.queryByTestId("state-menu-1")).not.toBeInTheDocument();
 
-    fireEvent.contextMenu(screen.getByTestId("county-select-1"));
+    const countySelect = screen.getByTestId("county-select-1");
+    fireEvent.pointerDown(countySelect, { button: 2, pointerType: "mouse" });
+    fireEvent.mouseDown(countySelect, { button: 2 });
+    fireEvent.contextMenu(countySelect);
     expect(screen.getByTestId("county-menu-1")).toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Apply" }));
     expect(screen.queryByTestId("county-menu-1")).not.toBeInTheDocument();

@@ -162,6 +162,19 @@ const CLOSED_MENU: MenuState = {
   y: 0
 };
 
+function suppressSecondaryPress(event: {
+  button: number;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}): void {
+  if (event.button === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 const multiSelectStyles: StylesConfig<Option, true> = {
   control: (base, state) => ({
     ...base,
@@ -254,6 +267,8 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
       <div style={styles.blockLabel}>
         <div
           data-testid={`state-select-${rowIndex + 1}`}
+          onMouseDownCapture={suppressSecondaryPress}
+          onPointerDownCapture={suppressSecondaryPress}
           onContextMenu={(event) => {
             event.preventDefault();
             setCountyMenu(CLOSED_MENU);
@@ -299,6 +314,8 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
       <div style={styles.blockLabel}>
         <div
           data-testid={`county-select-${rowIndex + 1}`}
+          onMouseDownCapture={suppressSecondaryPress}
+          onPointerDownCapture={suppressSecondaryPress}
           onContextMenu={(event) => {
             event.preventDefault();
             setStateMenu(CLOSED_MENU);
