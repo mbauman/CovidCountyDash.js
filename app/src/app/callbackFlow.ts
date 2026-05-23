@@ -27,7 +27,8 @@ import {
   type FetchSeriesContractInput,
   fetchSeriesContract,
   getCountyOptionsForStates,
-  loadDataSnapshot
+  loadDataSnapshot,
+  STATE_GROUPS
 } from "../services/dataService";
 import { toPlotlyFigureFromContracts } from "../plotly/adapters";
 import { buildPlotMetadata } from "../services/transforms";
@@ -63,12 +64,9 @@ function traceEvent(trace: (event: CallbackTraceEvent) => void, event: CallbackT
   trace(event);
 }
 
-const NORTHEAST_STATE_FIPS = new Set([9, 23, 25, 33, 34, 36, 42, 44, 50]);
-const MIDWEST_STATE_FIPS = new Set([17, 18, 26, 39, 55, 19, 20, 27, 29, 31, 38, 46]);
-const SOUTH_STATE_FIPS = new Set([
-  10, 11, 12, 13, 24, 37, 45, 51, 54, 1, 21, 28, 47, 5, 22, 40, 48
-]);
-const WEST_STATE_FIPS = new Set([4, 8, 16, 30, 32, 35, 49, 56, 2, 6, 15, 41, 53]);
+const STATE_GROUPS_BY_NAME = new Map<StateGroupName, Set<number>>(
+  STATE_GROUPS.map(([name, stateFips]) => [name as StateGroupName, new Set(stateFips)])
+);
 
 function deriveStateFips(fips: number): number {
   return fips < 1000 ? fips : Math.floor(fips / 1000);
@@ -84,22 +82,12 @@ function getAvailableStateFips(snapshot: DataSnapshot): number[] {
 
 function selectStatesForGroup(group: StateGroupName, snapshot: DataSnapshot): number[] {
   const availableStates = getAvailableStateFips(snapshot);
-  switch (group) {
-    case "all":
-      return availableStates;
-    case "lower49":
-      return availableStates.filter((stateFips) => stateFips !== 2 && stateFips !== 15);
-    case "northeast":
-      return availableStates.filter((stateFips) => NORTHEAST_STATE_FIPS.has(stateFips));
-    case "midwest":
-      return availableStates.filter((stateFips) => MIDWEST_STATE_FIPS.has(stateFips));
-    case "south":
-      return availableStates.filter((stateFips) => SOUTH_STATE_FIPS.has(stateFips));
-    case "west":
-      return availableStates.filter((stateFips) => WEST_STATE_FIPS.has(stateFips));
-    default:
-      return [];
+  const stateGroup = STATE_GROUPS_BY_NAME.get(group);
+  if (stateGroup == null) {
+    return [];
   }
+
+  return availableStates.filter((stateFips) => stateGroup.has(stateFips));
 }
 
 function getCountyFipsForStates(stateFips: number[], snapshot: DataSnapshot): number[] {

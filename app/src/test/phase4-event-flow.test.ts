@@ -6,7 +6,7 @@ import {
   requestApplyStateGroup,
   setSelectionAtIndex
 } from "../features/filters/filtersSlice";
-import type { FetchSeriesContractInput } from "../services/dataService";
+import type { DataSnapshot, FetchSeriesContractInput } from "../services/dataService";
 import type { TransformSeriesContract } from "../domain/covidData";
 
 function makeContract(location: string, value: number): TransformSeriesContract {
@@ -128,6 +128,53 @@ describe("phase 4 callback event flow", () => {
     await waitFor(() => {
       expect(store.getState().filters.selections[0]?.stateFips).toEqual([10, 20]);
       expect(store.getState().ui.committedRequestId).toBe(2);
+    });
+  });
+
+  it("keeps territories out of lower49 state-group selection", async () => {
+    const snapshot: DataSnapshot = {
+      records: [
+        { date: "2020-01-01", fips: 1, cases: 1, deaths: 0 },
+        { date: "2020-01-01", fips: 2, cases: 1, deaths: 0 },
+        { date: "2020-01-01", fips: 11, cases: 1, deaths: 0 },
+        { date: "2020-01-01", fips: 60, cases: 1, deaths: 0 },
+        { date: "2020-01-01", fips: 66, cases: 1, deaths: 0 }
+      ],
+      population: [],
+      stateNamesByFips: new Map([
+        [1, "Alabama"],
+        [2, "Alaska"],
+        [11, "District of Columbia"],
+        [60, "American Samoa"],
+        [66, "Guam"]
+      ]),
+      countyNamesByFips: new Map(),
+      stateOptions: [
+        { value: 1, label: "Alabama" },
+        { value: 2, label: "Alaska" },
+        { value: 11, label: "District of Columbia" },
+        { value: 60, label: "American Samoa" },
+        { value: 66, label: "Guam" }
+      ],
+      dateRange: ["2020-01-01", "2020-01-01"]
+    };
+
+    const store = createAppStore({
+      callbackFlowDependencies: {
+        getDataSnapshotFn: async () => snapshot,
+        trace: () => undefined
+      }
+    });
+
+    store.dispatch(
+      requestApplyStateGroup({
+        index: 0,
+        group: "lower49"
+      })
+    );
+
+    await waitFor(() => {
+      expect(store.getState().filters.selections[0]?.stateFips).toEqual([1, 11]);
     });
   });
 
