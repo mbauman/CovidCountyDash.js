@@ -18,7 +18,7 @@ export function App(): JSX.Element {
   return (
     <main style={styles.main}>
       <header style={styles.header}>
-        <h1 style={styles.title}>Covid County Dash</h1>
+        <h1 style={styles.title}>🦠 COVID-19 Tracked by US County</h1>
         <p style={styles.subtitle}>
           Visualization of <a href="https://github.com/nytimes/covid-19-data">data</a> from The New York Times,
           based on reports from state and local health agencies.
