@@ -107,6 +107,9 @@ export const selectLoadedThroughDate = (state: RootState): string | null => {
 export const selectCaveatVisibility = createSelector(
   (state: RootState) => state.filters.selections,
   (selections): boolean[] => {
+    const snapshot = getCachedDataSnapshot();
+    const population = snapshot?.population ?? PHASE2_BASELINE_POPULATION;
+    const populationFips = new Set(population.map((row) => row.fips));
     const selectedCountyFips = new Set<number>(
       selections.flatMap((selection) => selection.countyFips)
     );
@@ -120,12 +123,7 @@ export const selectCaveatVisibility = createSelector(
       selectedCountyFips.has(KANSAS_CITY_MO_FIPS),
       selectedCountyFips.has(JOPLIN_MO_FIPS),
       selectedCountyFips.has(UNKNOWN_STATE_10_FIPS) || selectedCountyFips.has(UNKNOWN_STATE_20_FIPS),
-      selectedCountyFips.size > 0 &&
-        [...selectedCountyFips].some((fips) => {
-          const snapshot = getCachedDataSnapshot();
-          const population = snapshot?.population ?? PHASE2_BASELINE_POPULATION;
-          return !population.some((row) => row.fips === fips);
-        })
+      selectedCountyFips.size > 0 && [...selectedCountyFips].some((fips) => !populationFips.has(fips))
     ];
   }
 );
@@ -183,16 +181,16 @@ export const selectPrimaryTransformRequest = (state: RootState): TransformReques
   };
 };
 
-function deriveDateExtent(records: TransformRequest["records"]): [string, string] | null {
-  if (records.length === 0) {
+const FALLBACK_DATE_EXTENT: [string, string] | null = (() => {
+  if (PHASE2_BASELINE_RECORDS.length === 0) {
     return null;
   }
 
-  const dates = records.map((record) => record.date).sort((left, right) => left.localeCompare(right));
+  const dates = PHASE2_BASELINE_RECORDS.map((record) => record.date).sort((left, right) => left.localeCompare(right));
   const start = dates[0];
   const end = dates[dates.length - 1];
   return start == null || end == null ? null : [start, end];
-}
+})();
 
 export const selectPrimaryPlotFigure = (state: RootState): PlotlyFigure => {
   return state.ui.figure ?? selectPrimaryPlotFigureMemoized(state);
@@ -244,7 +242,11 @@ const selectPrimaryPlotFigureMemoized = createSelector(
       .filter((series): series is NonNullable<typeof series> => series != null);
 
     const metadata = buildPlotMetadata(display);
-    return toPlotlyFigureFromContracts(seriesContracts, metadata, deriveDateExtent(records));
+    const dateExtent = snapshot?.dateRange[0] != null && snapshot.dateRange[1] != null
+      ? [snapshot.dateRange[0], snapshot.dateRange[1]] as [string, string]
+      : FALLBACK_DATE_EXTENT;
+
+    return toPlotlyFigureFromContracts(seriesContracts, metadata, dateExtent);
   }
 );
 

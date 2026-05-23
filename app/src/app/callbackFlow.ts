@@ -59,17 +59,6 @@ const DEFAULT_TRACE = (event: CallbackTraceEvent): void => {
   }
 };
 
-function deriveDateExtent(records: DataSnapshot["records"]): [string, string] | null {
-  if (records.length === 0) {
-    return null;
-  }
-
-  const dates = records.map((record) => record.date).sort((left, right) => left.localeCompare(right));
-  const start = dates[0];
-  const end = dates[dates.length - 1];
-  return start == null || end == null ? null : [start, end];
-}
-
 function traceEvent(trace: (event: CallbackTraceEvent) => void, event: CallbackTraceEvent): void {
   trace(event);
 }
@@ -170,8 +159,8 @@ export function createCallbackFlowListener(
       }
 
       const nextStateFips = selectStatesForGroup(action.payload.group, snapshot);
-      const countyOptions = getCountyFipsForStates(nextStateFips, snapshot);
-      const nextCountyFips = existing.countyFips.filter((fips) => countyOptions.includes(fips));
+      const countyOptionsSet = new Set(getCountyFipsForStates(nextStateFips, snapshot));
+      const nextCountyFips = existing.countyFips.filter((fips) => countyOptionsSet.has(fips));
 
       api.dispatch(
         setSelectionAtIndex({
@@ -310,7 +299,9 @@ export function createCallbackFlowListener(
         const figure = toPlotlyFigureFromContracts(
           contracts,
           metadata,
-          deriveDateExtent(snapshot.records)
+          snapshot.dateRange[0] != null && snapshot.dateRange[1] != null
+            ? [snapshot.dateRange[0], snapshot.dateRange[1]]
+            : null
         );
 
         api.dispatch(

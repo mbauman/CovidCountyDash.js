@@ -99,6 +99,14 @@ const SHORT_STATE: Record<number, string> = {
 let snapshotPromise: Promise<DataSnapshot> | null = null;
 let cachedSnapshot: DataSnapshot | null = null;
 
+interface SnapshotCountyOptionsIndex {
+  countiesByState: Map<number, GeographyOption[]>;
+  countiesByStateWithCode: Map<number, GeographyOption[]>;
+  combinedByStateKey: Map<string, GeographyOption[]>;
+}
+
+const countyOptionsIndexCache = new WeakMap<DataSnapshot, SnapshotCountyOptionsIndex>();
+
 function getNytRawBase(): string {
   const configured = import.meta.env.VITE_NYT_RAW_BASE;
   if (typeof configured !== "string" || configured.trim() === "") {
@@ -245,13 +253,7 @@ function rowsToDailyRecords(rows: RawDailyRecord[], stateFipsByName: Map<string,
     });
   }
 
-  return records.sort((left, right) => {
-    if (left.fips !== right.fips) {
-      return left.fips - right.fips;
-    }
-
-    return left.date.localeCompare(right.date);
-  });
+  return records;
 }
 
 function parseNytRows(csvText: string, withCounty: boolean): RawDailyRecord[] {
@@ -324,10 +326,72 @@ function deriveDateRange(records: DailyRecord[]): [string | null, string | null]
     return [null, null];
   }
 
-  const dates = records.map((record) => record.date).sort((left, right) => left.localeCompare(right));
-  const start = dates[0] ?? null;
-  const end = dates[dates.length - 1] ?? null;
+  let start = records[0]?.date ?? null;
+  let end = records[0]?.date ?? null;
+
+  for (let index = 1; index < records.length; index += 1) {
+    const date = records[index]?.date;
+    if (date == null) {
+      continue;
+    }
+
+    if (start == null || date.localeCompare(start) < 0) {
+      start = date;
+    }
+
+    if (end == null || date.localeCompare(end) > 0) {
+      end = date;
+    }
+  }
+
   return [start, end];
+}
+
+function getSnapshotCountyOptionsIndex(snapshot: DataSnapshot): SnapshotCountyOptionsIndex {
+  const cached = countyOptionsIndexCache.get(snapshot);
+  if (cached != null) {
+    return cached;
+  }
+
+  const countiesByState = new Map<number, GeographyOption[]>();
+  const countiesByStateWithCode = new Map<number, GeographyOption[]>();
+
+  for (const [fips, countyName] of snapshot.countyNamesByFips.entries()) {
+    const stateFips = fips < 1000 ? fips : Math.floor(fips / 1000);
+    const stateCode = SHORT_STATE[stateFips] ?? String(stateFips);
+
+    let plain = countiesByState.get(stateFips);
+    if (plain == null) {
+      plain = [];
+      countiesByState.set(stateFips, plain);
+    }
+
+    let withCode = countiesByStateWithCode.get(stateFips);
+    if (withCode == null) {
+      withCode = [];
+      countiesByStateWithCode.set(stateFips, withCode);
+    }
+
+    plain.push({ value: fips, label: countyName });
+    withCode.push({ value: fips, label: `${countyName}, ${stateCode}` });
+  }
+
+  for (const options of countiesByState.values()) {
+    options.sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  for (const options of countiesByStateWithCode.values()) {
+    options.sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  const index: SnapshotCountyOptionsIndex = {
+    countiesByState,
+    countiesByStateWithCode,
+    combinedByStateKey: new Map<string, GeographyOption[]>()
+  };
+
+  countyOptionsIndexCache.set(snapshot, index);
+  return index;
 }
 
 function makeFixtureSnapshot(): DataSnapshot {
@@ -453,24 +517,31 @@ export function getCountyOptionsForStates(
     return [];
   }
 
-  const selectedStates = new Set(selectedStateFips);
-  const sameState = selectedStates.size === 1;
-  const countyOptions: GeographyOption[] = [];
+  const index = getSnapshotCountyOptionsIndex(snapshot);
+  const uniqueStates = [...new Set(selectedStateFips)].sort((left, right) => left - right);
 
-  for (const [fips, countyName] of snapshot.countyNamesByFips.entries()) {
-    const stateFips = fips < 1000 ? fips : Math.floor(fips / 1000);
-    if (!selectedStates.has(stateFips)) {
-      continue;
-    }
-
-    const stateCode = SHORT_STATE[stateFips] ?? String(stateFips);
-    countyOptions.push({
-      value: fips,
-      label: sameState ? countyName : `${countyName}, ${stateCode}`
-    });
+  if (uniqueStates.length === 1) {
+    return [...(index.countiesByState.get(uniqueStates[0] ?? 0) ?? [])];
   }
 
-  return countyOptions.sort((left, right) => left.label.localeCompare(right.label));
+  const cacheKey = uniqueStates.join(",");
+  const cached = index.combinedByStateKey.get(cacheKey);
+  if (cached != null) {
+    return [...cached];
+  }
+
+  const combined: GeographyOption[] = [];
+  for (const stateFips of uniqueStates) {
+    const stateOptions = index.countiesByStateWithCode.get(stateFips);
+    if (stateOptions == null) {
+      continue;
+    }
+    combined.push(...stateOptions);
+  }
+
+  combined.sort((left, right) => left.label.localeCompare(right.label));
+  index.combinedByStateKey.set(cacheKey, combined);
+  return [...combined];
 }
 
 export async function fetchSeries(input: DataServiceInput): Promise<DataServiceResult> {

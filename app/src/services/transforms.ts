@@ -13,6 +13,15 @@ const NYC_FIPS = 36998;
 const KANSAS_CITY_MO_FIPS = 29998;
 const JOPLIN_MO_FIPS = 29997;
 
+interface RecordsIndex {
+  byFips: Map<number, DailyRecord[]>;
+  sortedDates: string[];
+  dateToIndex: Map<string, number>;
+}
+
+const recordsIndexCache = new WeakMap<DailyRecord[], RecordsIndex>();
+const populationMapCache = new WeakMap<PopulationRow[], Map<number, number | null>>();
+
 export function repairMissingFips(
   state: string,
   county: string | null,
@@ -72,30 +81,100 @@ function rollingMean(values: number[], window: number): number[] {
     return [...values];
   }
 
-  return values.map((_, index) => {
-    const start = Math.max(0, index - window + 1);
-    const slice = values.slice(start, index + 1);
-    const sum = slice.reduce((acc, item) => acc + item, 0);
-    return sum / slice.length;
-  });
+  const result: number[] = new Array(values.length);
+  let rollingSum = 0;
+
+  for (let index = 0; index < values.length; index += 1) {
+    rollingSum += values[index] ?? 0;
+
+    if (index >= window) {
+      rollingSum -= values[index - window] ?? 0;
+    }
+
+    const currentWindow = Math.min(window, index + 1);
+    result[index] = rollingSum / currentWindow;
+  }
+
+  return result;
+}
+
+function getRecordsIndex(records: DailyRecord[]): RecordsIndex {
+  const cached = recordsIndexCache.get(records);
+  if (cached != null) {
+    return cached;
+  }
+
+  const byFips = new Map<number, DailyRecord[]>();
+  const dateSet = new Set<string>();
+
+  for (const row of records) {
+    let bucket = byFips.get(row.fips);
+    if (bucket == null) {
+      bucket = [];
+      byFips.set(row.fips, bucket);
+    }
+    bucket.push(row);
+    dateSet.add(row.date);
+  }
+
+  const sortedDates = [...dateSet].sort((left, right) => left.localeCompare(right));
+  const dateToIndex = new Map<string, number>(
+    sortedDates.map((date, index) => [date, index])
+  );
+
+  const index = { byFips, sortedDates, dateToIndex };
+  recordsIndexCache.set(records, index);
+  return index;
 }
 
 function aggregateByDate(records: DailyRecord[], selectedFips: Set<number>, metric: "cases" | "deaths") {
-  const grouped = new Map<string, number>();
-  for (const row of records) {
-    if (!selectedFips.has(row.fips)) {
-      continue;
-    }
-    grouped.set(row.date, (grouped.get(row.date) ?? 0) + row[metric]);
+  const index = getRecordsIndex(records);
+  if (selectedFips.size === 0 || index.sortedDates.length === 0) {
+    return { dates: [], values: [] };
   }
 
-  const dates = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
-  const values = dates.map((date) => grouped.get(date) ?? 0);
+  const sums = new Array<number>(index.sortedDates.length).fill(0);
+  const seen = new Array<boolean>(index.sortedDates.length).fill(false);
+
+  for (const fips of selectedFips) {
+    const rows = index.byFips.get(fips);
+    if (rows == null) {
+      continue;
+    }
+
+    for (const row of rows) {
+      const dateIndex = index.dateToIndex.get(row.date);
+      if (dateIndex == null) {
+        continue;
+      }
+
+      const current = sums[dateIndex] ?? 0;
+      sums[dateIndex] = current + row[metric];
+      seen[dateIndex] = true;
+    }
+  }
+
+  const dates: string[] = [];
+  const values: number[] = [];
+  for (let idx = 0; idx < index.sortedDates.length; idx += 1) {
+    if (!seen[idx]) {
+      continue;
+    }
+
+    dates.push(index.sortedDates[idx] ?? "");
+    values.push(sums[idx] ?? 0);
+  }
+
   return { dates, values };
 }
 
 function normalize(values: number[], selectedFips: Set<number>, population: PopulationRow[]): number[] {
-  const popMap = new Map(population.map((row) => [row.fips, row.pop]));
+  let popMap = populationMapCache.get(population);
+  if (popMap == null) {
+    popMap = new Map(population.map((row) => [row.fips, row.pop]));
+    populationMapCache.set(population, popMap);
+  }
+
   const totalPopulation = [...selectedFips].reduce((acc, fips) => {
     const pop = popMap.get(fips);
     return pop == null ? acc : acc + pop;
