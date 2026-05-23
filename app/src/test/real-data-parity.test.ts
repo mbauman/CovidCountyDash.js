@@ -14,7 +14,7 @@ function finite(values: number[] | undefined): number[] {
   return (values ?? []).filter((value): value is number => Number.isFinite(value));
 }
 
-describe("phase 5 real-data parity oracles", () => {
+describe("real-data parity oracles", () => {
   beforeEach(() => {
     vi.stubEnv("COVID_DASH_REAL_DATA", "1");
     resetDataSnapshotCache();

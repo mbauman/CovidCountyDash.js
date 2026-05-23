@@ -22,7 +22,7 @@ function renderApp(): void {
   );
 }
 
-describe("phase 3 controls parity", () => {
+describe("controls layout behavior", () => {
   it("shows daily label for cases by default", () => {
     renderApp();
 

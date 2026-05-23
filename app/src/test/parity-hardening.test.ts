@@ -28,7 +28,7 @@ function simplifyFigure(figure: Figure) {
   };
 }
 
-describe("phase 5 parity and hardening", () => {
+describe("parity and hardening", () => {
   it("matches baseline scenario A functional signature for default state", async () => {
     const store = createAppStore({
       callbackFlowDependencies: {
@@ -129,7 +129,7 @@ describe("phase 5 parity and hardening", () => {
       store.dispatch(
         callbackTransitionStarted({
           requestId,
-          trigger: "phase5/memory-check",
+          trigger: "transition-log/memory-check",
           selectedFipsCount: 1
         })
       );

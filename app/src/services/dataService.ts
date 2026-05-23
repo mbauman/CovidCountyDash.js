@@ -34,6 +34,13 @@ export interface DataSnapshot {
   dateRange: [string | null, string | null];
 }
 
+export interface ResolvedSnapshotData {
+  records: DailyRecord[];
+  population: PopulationRow[];
+  stateOptions: GeographyOption[];
+  dateExtent: [string, string] | null;
+}
+
 interface SerializedDataSnapshot {
   records: Array<[string, number, number, number]>;
   population: Array<[number, number | null]>;
@@ -121,6 +128,16 @@ export const STATE_GROUPS: Array<[string, number[]]> = [
   ["midwest", [17, 18, 19, 20, 26, 27, 29, 31, 38, 39, 46, 55]],
   ["south", [1, 5, 10, 11, 12, 13, 21, 22, 24, 28, 37, 40, 45, 47, 48, 51, 54]],
   ["west", [4, 6, 8, 16, 30, 32, 35, 41, 49, 53, 56]]
+];
+
+export const FIXTURE_STATE_OPTIONS: GeographyOption[] = [
+  { value: 10, label: "State 10" },
+  { value: 20, label: "State 20" }
+];
+
+export const FIXTURE_COUNTY_OPTIONS: GeographyOption[] = [
+  { value: 10, label: "County 10" },
+  { value: 20, label: "County 20" }
 ];
 
 let snapshotPromise: Promise<DataSnapshot> | null = null;
@@ -466,6 +483,15 @@ function deriveDateRange(records: DailyRecord[]): [string | null, string | null]
   return [start, end];
 }
 
+function toDateExtent(dateRange: [string | null, string | null]): [string, string] | null {
+  const [start, end] = dateRange;
+  if (start == null || end == null) {
+    return null;
+  }
+
+  return [start, end];
+}
+
 function getSnapshotCountyOptionsIndex(snapshot: DataSnapshot): SnapshotCountyOptionsIndex {
   const cached = countyOptionsIndexCache.get(snapshot);
   if (cached != null) {
@@ -524,16 +550,33 @@ function makeFixtureSnapshot(): DataSnapshot {
   ]);
 
   return {
-    records: PHASE2_BASELINE_RECORDS,
-    population: PHASE2_BASELINE_POPULATION,
+    records: FIXTURE_RECORDS,
+    population: FIXTURE_POPULATION,
     stateNamesByFips,
     countyNamesByFips,
-    stateOptions: [
-      { value: 10, label: "State 10" },
-      { value: 20, label: "State 20" }
-    ],
-    dateRange: deriveDateRange(PHASE2_BASELINE_RECORDS)
+    stateOptions: FIXTURE_STATE_OPTIONS,
+    dateRange: FIXTURE_DATE_RANGE
   };
+}
+
+async function loadRuntimeSnapshot(): Promise<DataSnapshot> {
+  if (!shouldPreferStaticSnapshot()) {
+    return makeRealSnapshot();
+  }
+
+  try {
+    return await makeStaticSnapshot();
+  } catch (error) {
+    if (!shouldAllowRemoteFallback()) {
+      throw error;
+    }
+
+    if (typeof console !== "undefined" && typeof console.warn === "function") {
+      console.warn("Static snapshot unavailable, falling back to NYT source", error);
+    }
+
+    return makeRealSnapshot();
+  }
 }
 
 async function makeRealSnapshot(): Promise<DataSnapshot> {
@@ -575,25 +618,7 @@ export async function loadDataSnapshot(): Promise<DataSnapshot> {
   snapshotPromise = (async () => {
     const snapshot = isFixtureMode()
       ? makeFixtureSnapshot()
-      : await (async () => {
-          if (!shouldPreferStaticSnapshot()) {
-            return makeRealSnapshot();
-          }
-
-          try {
-            return await makeStaticSnapshot();
-          } catch (error) {
-            if (!shouldAllowRemoteFallback()) {
-              throw error;
-            }
-
-            if (typeof console !== "undefined" && typeof console.warn === "function") {
-              console.warn("Static snapshot unavailable, falling back to NYT source", error);
-            }
-
-            return makeRealSnapshot();
-          }
-        })();
+      : await loadRuntimeSnapshot();
 
     cachedSnapshot = snapshot;
     snapshotPromise = null;
@@ -608,6 +633,24 @@ export async function loadDataSnapshot(): Promise<DataSnapshot> {
 
 export function getCachedDataSnapshot(): DataSnapshot | null {
   return cachedSnapshot;
+}
+
+export function resolveSnapshotData(snapshot: DataSnapshot | null): ResolvedSnapshotData {
+  if (snapshot == null) {
+    return {
+      records: FIXTURE_RECORDS,
+      population: FIXTURE_POPULATION,
+      stateOptions: FIXTURE_STATE_OPTIONS,
+      dateExtent: FIXTURE_DATE_EXTENT
+    };
+  }
+
+  return {
+    records: snapshot.records,
+    population: snapshot.population,
+    stateOptions: snapshot.stateOptions,
+    dateExtent: toDateExtent(snapshot.dateRange)
+  };
 }
 
 export function resetDataSnapshotCache(): void {
@@ -743,10 +786,7 @@ export async function fetchSeriesContract(
   return buildSeriesContract(input.request, input.location);
 }
 
-export const EMPTY_RECORDS: DailyRecord[] = [];
-export const EMPTY_POPULATION: PopulationRow[] = [];
-
-export const PHASE2_BASELINE_RECORDS: DailyRecord[] = [
+export const FIXTURE_RECORDS: DailyRecord[] = [
   { date: "2020-01-01", fips: 10, cases: 10, deaths: 1 },
   { date: "2020-01-01", fips: 20, cases: 5, deaths: 0 },
   { date: "2020-01-02", fips: 10, cases: 20, deaths: 2 },
@@ -755,23 +795,10 @@ export const PHASE2_BASELINE_RECORDS: DailyRecord[] = [
   { date: "2020-01-03", fips: 20, cases: 15, deaths: 2 }
 ];
 
-export const PHASE2_BASELINE_POPULATION: PopulationRow[] = [
+export const FIXTURE_POPULATION: PopulationRow[] = [
   { fips: 10, pop: 1000 },
   { fips: 20, pop: 500 }
 ];
 
-export function createEmptyTransformRequest(): TransformRequest {
-  return {
-    records: EMPTY_RECORDS,
-    selectedFips: [],
-    population: EMPTY_POPULATION,
-    metricType: "cases",
-    valueMode: "diff",
-    rollingDays: 7,
-    normalizeByPopulation: true,
-  };
-}
-
-export async function fetchEmptySeries(): Promise<DataServiceResult> {
-  return fetchSeries({ request: createEmptyTransformRequest() });
-}
+const FIXTURE_DATE_RANGE = deriveDateRange(FIXTURE_RECORDS);
+const FIXTURE_DATE_EXTENT = toDateExtent(FIXTURE_DATE_RANGE);

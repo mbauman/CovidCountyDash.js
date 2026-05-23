@@ -1,4 +1,3 @@
-import type { DataServiceResult } from "../services/dataService";
 import type { TransformPlotMetadata, TransformSeriesContract } from "../domain/covidData";
 
 interface AxisTitle {
@@ -30,25 +29,6 @@ interface Data {
 export interface PlotlyFigure {
   data: Data[];
   layout: Partial<Layout>;
-}
-
-export function toPlotlyFigure(series: DataServiceResult): PlotlyFigure {
-  return {
-    data: [
-      {
-        type: "scatter",
-        mode: "lines",
-        name: "placeholder",
-        x: series.dates,
-        y: series.values
-      }
-    ],
-    layout: {
-      title: { text: "Phase 1 Placeholder Figure" },
-      xaxis: { title: { text: "Date" } },
-      yaxis: { title: { text: "Value" } }
-    }
-  };
 }
 
 export function toPlotlyFigureFromContract(

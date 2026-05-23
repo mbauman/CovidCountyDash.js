@@ -4,7 +4,7 @@ import { Provider } from "react-redux";
 import { store } from "../app/store";
 import { App } from "../App";
 
-describe("phase 3 app shell", () => {
+describe("app shell", () => {
   it("renders dashboard title and core regions", () => {
     render(
       <Provider store={store}>

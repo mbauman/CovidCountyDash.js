@@ -56,7 +56,7 @@ const DEFAULT_TRACE = (event: CallbackTraceEvent): void => {
   }
 
   if (typeof console !== "undefined" && typeof console.debug === "function") {
-    console.debug("[phase4]", event);
+    console.debug("[callback-flow]", event);
   }
 };
 

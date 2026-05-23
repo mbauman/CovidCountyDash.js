@@ -18,7 +18,7 @@ function makeContract(location: string, value: number): TransformSeriesContract 
   };
 }
 
-describe("phase 4 callback event flow", () => {
+describe("callback event flow", () => {
   it("uses last-write-wins and ignores stale async responses", async () => {
     const pending: Array<(contract: TransformSeriesContract) => void> = [];
 
