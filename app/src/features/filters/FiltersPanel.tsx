@@ -14,7 +14,6 @@ import {
 } from "./filtersSlice";
 import {
   selectCountyOptionsForStates,
-  selectDateRange,
   selectRowVisibility,
   selectStateOptions,
   selectValueModeOptions
@@ -27,7 +26,6 @@ export function FiltersPanel(): JSX.Element {
   const filters = useAppSelector((state) => state.filters);
   const stateOptions = useAppSelector(selectStateOptions);
   const valueModeOptions = useAppSelector(selectValueModeOptions);
-  const [dateStart, dateEnd] = useAppSelector(selectDateRange);
 
   const handleReset = (): void => {
     dispatch(resetFilters());
@@ -37,104 +35,106 @@ export function FiltersPanel(): JSX.Element {
     <section aria-label="Controls" style={styles.panel}>
       <div style={styles.headerRow}>
         <h2 style={styles.header}>Filters</h2>
-        <button type="button" onClick={handleReset}>
-          Reset Controls
-        </button>
       </div>
 
-      <div style={styles.groupRow}>
-        <label style={styles.blockLabel}>
-          Date Start
-          <input type="date" value={dateStart ?? ""} disabled readOnly />
-        </label>
-        <label style={styles.blockLabel}>
-          Date End
-          <input type="date" value={dateEnd ?? ""} disabled readOnly />
-        </label>
-      </div>
+      <div style={styles.controlsRow}>
+        <div style={styles.selectionTable}>
+          <div style={styles.selectionHead}>
+            <span>State</span>
+            <span>County</span>
+          </div>
+          <div>
+            {Array.from({ length: ROW_COUNT }, (_, index) => (
+              <SelectionRow key={index} rowIndex={index} stateOptions={stateOptions} />
+            ))}
+          </div>
+        </div>
 
-      <fieldset style={styles.group}>
-        <legend>Type</legend>
-        <label>
-          <input
-            type="radio"
-            name="metric-type"
-            value="cases"
-            checked={filters.metricType === "cases"}
-            onChange={() => dispatch(setMetricType("cases"))}
-          />
-          Cases
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="metric-type"
-            value="deaths"
-            checked={filters.metricType === "deaths"}
-            onChange={() => dispatch(setMetricType("deaths"))}
-          />
-          Deaths
-        </label>
-      </fieldset>
+        <div style={styles.optionsCard}>
+          <b>Options</b>
 
-      <fieldset style={styles.group}>
-        <legend>Values</legend>
-        {valueModeOptions.map((option) => (
-          <label key={option.value}>
-            <input
-              type="radio"
-              name="value-mode"
-              value={option.value}
-              checked={filters.valueMode === option.value}
-              onChange={() => dispatch(setValueMode(option.value))}
-            />
-            {option.label}
-          </label>
-        ))}
-      </fieldset>
+          <fieldset style={styles.group}>
+            <legend>Type</legend>
+            <label>
+              <input
+                type="radio"
+                name="metric-type"
+                value="cases"
+                checked={filters.metricType === "cases"}
+                onChange={() => dispatch(setMetricType("cases"))}
+              />
+              Cases
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="metric-type"
+                value="deaths"
+                checked={filters.metricType === "deaths"}
+                onChange={() => dispatch(setMetricType("deaths"))}
+              />
+              Deaths
+            </label>
+          </fieldset>
 
-      {filters.valueMode === "diff" ? (
-        <label style={styles.blockLabel}>
-          Rolling day average
-          <input
-            aria-label="Rolling day average"
-            type="number"
-            min={1}
-            max={14}
-            value={filters.rollingDays}
-            onChange={(event) => {
-              const nextValue = Number(event.target.value);
-              const bounded = Number.isFinite(nextValue) ? Math.max(1, Math.min(14, nextValue)) : 7;
-              dispatch(setRollingDays(bounded));
-            }}
-          />
-        </label>
-      ) : null}
+          <fieldset style={styles.group}>
+            <legend>Values</legend>
+            {valueModeOptions.map((option) => (
+              <label key={option.value}>
+                <input
+                  type="radio"
+                  name="value-mode"
+                  value={option.value}
+                  checked={filters.valueMode === option.value}
+                  onChange={() => dispatch(setValueMode(option.value))}
+                />
+                {option.label}
+              </label>
+            ))}
+          </fieldset>
 
-      <fieldset style={styles.group}>
-        <legend>Display</legend>
-        <label>
-          <input
-            type="checkbox"
-            checked={filters.normalizeByPopulation}
-            onChange={(event) => dispatch(setNormalizeByPopulation(event.target.checked))}
-          />
-          Normalize by population
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={filters.useLogScale}
-            onChange={(event) => dispatch(setUseLogScale(event.target.checked))}
-          />
-          Log scale
-        </label>
-      </fieldset>
+          {filters.valueMode === "diff" ? (
+            <label style={styles.blockLabel}>
+              Rolling day average
+              <input
+                aria-label="Rolling day average"
+                type="number"
+                min={1}
+                max={14}
+                value={filters.rollingDays}
+                onChange={(event) => {
+                  const nextValue = Number(event.target.value);
+                  const bounded = Number.isFinite(nextValue) ? Math.max(1, Math.min(14, nextValue)) : 7;
+                  dispatch(setRollingDays(bounded));
+                }}
+              />
+            </label>
+          ) : null}
 
-      <div>
-        {Array.from({ length: ROW_COUNT }, (_, index) => (
-          <SelectionRow key={index} rowIndex={index} stateOptions={stateOptions} />
-        ))}
+          <fieldset style={styles.group}>
+            <legend>Display</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={filters.normalizeByPopulation}
+                onChange={(event) => dispatch(setNormalizeByPopulation(event.target.checked))}
+              />
+              Normalize by population
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={filters.useLogScale}
+                onChange={(event) => dispatch(setUseLogScale(event.target.checked))}
+              />
+              Log scale
+            </label>
+          </fieldset>
+
+          <button type="button" onClick={handleReset}>
+            Reset Controls
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -251,50 +251,7 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
       aria-hidden={!rowVisible}
       style={styles.row}
     >
-      <h3 style={styles.rowTitle}>Selection Row {rowIndex + 1}</h3>
-
-      <div style={styles.groupButtonsRow}>
-        <span>State groups</span>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "all" }))}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "lower49" }))}
-        >
-          Lower 49
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "northeast" }))}
-        >
-          Northeast
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "midwest" }))}
-        >
-          Midwest
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "south" }))}
-        >
-          South
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch(requestApplyStateGroup({ index: rowIndex, group: "west" }))}
-        >
-          West
-        </button>
-      </div>
-
       <div style={styles.blockLabel}>
-        <span>State</span>
         <div
           data-testid={`state-select-${rowIndex + 1}`}
           onContextMenu={(event) => {
@@ -340,7 +297,6 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
       </div>
 
       <div style={styles.blockLabel}>
-        <span>County</span>
         <div
           data-testid={`county-select-${rowIndex + 1}`}
           onContextMenu={(event) => {
@@ -518,44 +474,54 @@ const styles: Record<string, CSSProperties> = {
     padding: "1rem"
   },
   headerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "0.5rem"
+    marginBottom: "0.65rem"
   },
   header: {
     margin: 0,
     fontSize: "1.2rem"
   },
-  groupRow: {
+  controlsRow: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(10rem, 1fr))",
-    gap: "0.75rem",
-    marginTop: "0.8rem"
+    gridTemplateColumns: "minmax(22rem, 2.2fr) minmax(16rem, 1fr)",
+    gap: "0.9rem",
+    alignItems: "start"
+  },
+  selectionTable: {
+    border: "1px solid #d8dfcd",
+    borderRadius: "10px",
+    background: "#fff"
+  },
+  selectionHead: {
+    display: "grid",
+    gridTemplateColumns: "2fr 3fr",
+    gap: "0.6rem",
+    fontWeight: 600,
+    padding: "0.6rem 0.75rem",
+    borderBottom: "1px solid #d8dfcd",
+    background: "#eef4e2"
+  },
+  optionsCard: {
+    border: "1px solid #d8dfcd",
+    borderRadius: "10px",
+    background: "#fff",
+    padding: "0.65rem",
+    display: "grid",
+    gap: "0.55rem"
   },
   group: {
     display: "grid",
     gap: "0.4rem",
-    marginTop: "0.8rem",
     border: "1px solid #d8dfcd",
     borderRadius: "8px",
     padding: "0.65rem"
   },
   row: {
-    marginTop: "0.8rem",
+    display: "grid",
+    gridTemplateColumns: "2fr 3fr",
+    gap: "0.6rem",
+    padding: "0.6rem 0.75rem",
     borderTop: "1px solid #d8dfcd",
-    paddingTop: "0.8rem"
-  },
-  rowTitle: {
-    margin: "0 0 0.4rem",
-    fontSize: "1rem"
-  },
-  groupButtonsRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.35rem",
-    alignItems: "center",
-    marginBottom: "0.6rem"
+    background: "#fff"
   },
   inlineLabel: {
     display: "grid",
