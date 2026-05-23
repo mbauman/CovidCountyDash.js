@@ -12,6 +12,7 @@ import {
 } from "../features/filters/filtersSlice";
 import { callbackTransitionStarted } from "../features/ui/uiSlice";
 import { selectCaveatVisibility } from "../selectors";
+import * as dataService from "../services/dataService";
 
 type Figure = RootState["ui"]["figure"];
 
@@ -102,7 +103,23 @@ describe("parity and hardening", () => {
     expect(traceNames.every((name) => typeof name === "string" && name.length > 0)).toBe(true);
   });
 
-  it("applies caveat-note visibility rules for known FIPS caveats", () => {
+  it("applies caveat-note visibility rules from superscript markers in county names", () => {
+    const getCachedDataSnapshotSpy = vi.spyOn(dataService, "getCachedDataSnapshot");
+    getCachedDataSnapshotSpy.mockReturnValue({
+      records: [],
+      population: [],
+      stateNamesByFips: new Map(),
+      countyNamesByFips: new Map([
+        [36998, "New York City¹"],
+        [29998, "Kansas City²"],
+        [29037, "Cass³"],
+        [29997, "Joplin⁴"],
+        [29145, "Newton⁵"]
+      ]),
+      stateOptions: [],
+      dateRange: [null, null]
+    });
+
     const store = createAppStore({
       enableCallbackFlow: false
     });
@@ -112,12 +129,13 @@ describe("parity and hardening", () => {
         index: 0,
         selection: {
           stateFips: [],
-          countyFips: [36998, 29998, 29997, 10999, 99999]
+          countyFips: [36998, 29998, 29037, 29997, 29145]
         }
       })
     );
 
     expect(selectCaveatVisibility(store.getState())).toEqual([true, true, true, true, true]);
+    getCachedDataSnapshotSpy.mockRestore();
   });
 
   it("keeps transition log bounded to 100 events as a memory safeguard", () => {

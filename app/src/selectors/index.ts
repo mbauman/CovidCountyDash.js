@@ -21,11 +21,7 @@ export interface ValueModeOption {
   label: string;
 }
 
-const NYC_FIPS = 36998;
-const KANSAS_CITY_MO_FIPS = 29998;
-const JOPLIN_MO_FIPS = 29997;
-const UNKNOWN_STATE_10_FIPS = 10999;
-const UNKNOWN_STATE_20_FIPS = 20999;
+const CAVEAT_SUPERSCRIPTS = ["¹", "²", "³", "⁴", "⁵"] as const;
 
 const VALUE_MODE_OPTIONS_CASES: ValueModeOption[] = [
   { value: "diff", label: "New daily cases" },
@@ -108,23 +104,26 @@ export const selectCaveatVisibility = createSelector(
   selectFilterSelections,
   selectUiDataVersion,
   (selections): boolean[] => {
-    const { population } = getResolvedSnapshotData();
-    const populationFips = new Set(population.map((row) => row.fips));
+    const snapshot = getCachedDataSnapshot();
     const selectedCountyFips = new Set<number>(
       selections.flatMap((selection) => selection.countyFips)
     );
 
-    if (selectedCountyFips.size === 0) {
+    if (selectedCountyFips.size === 0 || snapshot == null) {
       return EMPTY_CAVEAT_VISIBILITY;
     }
 
-    return [
-      selectedCountyFips.has(NYC_FIPS),
-      selectedCountyFips.has(KANSAS_CITY_MO_FIPS),
-      selectedCountyFips.has(JOPLIN_MO_FIPS),
-      selectedCountyFips.has(UNKNOWN_STATE_10_FIPS) || selectedCountyFips.has(UNKNOWN_STATE_20_FIPS),
-      selectedCountyFips.size > 0 && [...selectedCountyFips].some((fips) => !populationFips.has(fips))
-    ];
+    const selectedCountyNames = [...selectedCountyFips]
+      .map((fips) => snapshot.countyNamesByFips.get(fips) ?? "")
+      .filter((name) => name.length > 0);
+
+    if (selectedCountyNames.length === 0) {
+      return EMPTY_CAVEAT_VISIBILITY;
+    }
+
+    return CAVEAT_SUPERSCRIPTS.map((marker) =>
+      selectedCountyNames.some((countyName) => countyName.includes(marker))
+    );
   }
 );
 
