@@ -7,7 +7,7 @@ import type {
   TransformSeriesContract
 } from "../domain/covidData";
 import { buildSeries, buildSeriesContract } from "./transforms";
-import populationCsvText from "../data/pop2020.csv?raw";
+import populationSnapshot from "../data/pop2020.json";
 
 export interface DataServiceInput {
   request: TransformRequest;
@@ -57,9 +57,17 @@ interface SerializedDataSnapshot {
   dateRange: [string | null, string | null];
 }
 
+interface SerializedPopulationSnapshot {
+  population: Array<[number, number | null]>;
+  stateNamesByFips: Array<[number, string]>;
+  countyNamesByFips: Array<[number, string]>;
+  stateOptions: GeographyOption[];
+}
+
 const COUNTIES_YEARS = ["2020", "2021", "2022"];
 const DEFAULT_NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
 const DEFAULT_STATIC_SNAPSHOT_PATH = "data/nyt-snapshot.json.gz";
+const DEFAULT_POPULATION_SNAPSHOT_PATH = "data/pop2020.json.gz";
 
 const SHORT_STATE: Record<number, string> = {
   1: "AL",
@@ -208,6 +216,21 @@ function getStaticSnapshotUrl(): string {
   return new URL(rawPath.replace(/^\/+/, ""), window.location.origin + normalizedBase).toString();
 }
 
+function getPopulationSnapshotUrl(): string {
+  const configured = import.meta.env.VITE_POPULATION_SNAPSHOT_URL;
+  const rawPath = typeof configured === "string" && configured.trim() !== ""
+    ? configured.trim()
+    : DEFAULT_POPULATION_SNAPSHOT_PATH;
+
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath;
+  }
+
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  return new URL(rawPath.replace(/^\/+/, ""), window.location.origin + normalizedBase).toString();
+}
+
 function isFixtureMode(): boolean {
   if (typeof process === "undefined") {
     return false;
@@ -277,54 +300,6 @@ function parseNumber(value: string): number | null {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parsePopulation(csvText: string): {
-  population: PopulationRow[];
-  stateNamesByFips: Map<number, string>;
-  countyNamesByFips: Map<number, string>;
-  stateOptions: GeographyOption[];
-} {
-  const rows = parseCsvRows(csvText);
-  const body = rows.slice(1);
-
-  const population: PopulationRow[] = [];
-  const stateNamesByFips = new Map<number, string>();
-  const countyNamesByFips = new Map<number, string>();
-
-  for (const row of body) {
-    const fips = parseNumber(row[0] ?? "");
-    if (fips == null) {
-      continue;
-    }
-
-    const pop = parseNumber(row[1] ?? "");
-    const state = row[2] ?? "";
-    const county = row[3] ?? "";
-
-    population.push({
-      fips,
-      pop
-    });
-
-    if (county === "") {
-      stateNamesByFips.set(fips, state);
-      continue;
-    }
-
-    countyNamesByFips.set(fips, county);
-  }
-
-  const stateOptions = [...stateNamesByFips.entries()]
-    .sort((left, right) => left[1].localeCompare(right[1]))
-    .map(([value, label]) => ({ value, label }));
-
-  return {
-    population,
-    stateNamesByFips,
-    countyNamesByFips,
-    stateOptions
-  };
 }
 
 function rowsToDailyRecords(rows: RawDailyRecord[], stateFipsByName: Map<string, number>): DailyRecord[] {
@@ -405,24 +380,24 @@ function repairMissingFipsFromStateMap(
   return null;
 }
 
-async function parseStaticJsonResponse(response: Response): Promise<SerializedDataSnapshot> {
-  const parsed = (await response.json()) as SerializedDataSnapshot;
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const parsed = (await response.json()) as T;
   return parsed;
 }
 
-async function fetchStaticSnapshotByUrl(url: string): Promise<SerializedDataSnapshot> {
+async function fetchJsonByUrl<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`failed to fetch static snapshot ${url}: ${response.status}`);
+    throw new Error(`failed to fetch json payload ${url}: ${response.status}`);
   }
 
   if (!url.endsWith(".gz")) {
-    return parseStaticJsonResponse(response);
+    return parseJsonResponse<T>(response);
   }
 
   try {
     const maybeJsonText = await response.clone().text();
-    return JSON.parse(maybeJsonText) as SerializedDataSnapshot;
+    return JSON.parse(maybeJsonText) as T;
   } catch {
     // The response body is still compressed bytes; fall through to explicit gzip decoding.
   }
@@ -434,7 +409,51 @@ async function fetchStaticSnapshotByUrl(url: string): Promise<SerializedDataSnap
 
   const decompressed = body.pipeThrough(new DecompressionStream("gzip"));
   const text = await new Response(decompressed).text();
-  return JSON.parse(text) as SerializedDataSnapshot;
+  return JSON.parse(text) as T;
+}
+
+function deserializePopulationSnapshot(serialized: SerializedPopulationSnapshot): {
+  population: PopulationRow[];
+  stateNamesByFips: Map<number, string>;
+  countyNamesByFips: Map<number, string>;
+  stateOptions: GeographyOption[];
+} {
+  return {
+    population: serialized.population.map(([fips, pop]) => ({ fips, pop })),
+    stateNamesByFips: new Map(serialized.stateNamesByFips),
+    countyNamesByFips: new Map(serialized.countyNamesByFips),
+    stateOptions: serialized.stateOptions
+  };
+}
+
+async function loadPopulationSnapshot(): Promise<{
+  population: PopulationRow[];
+  stateNamesByFips: Map<number, string>;
+  countyNamesByFips: Map<number, string>;
+  stateOptions: GeographyOption[];
+}> {
+  const url = getPopulationSnapshotUrl();
+
+  try {
+    const serialized = await fetchJsonByUrl<SerializedPopulationSnapshot>(url);
+    return deserializePopulationSnapshot(serialized);
+  } catch (primaryError) {
+    if (url.endsWith(".gz")) {
+      try {
+        const jsonUrl = url.slice(0, -3);
+        const serialized = await fetchJsonByUrl<SerializedPopulationSnapshot>(jsonUrl);
+        return deserializePopulationSnapshot(serialized);
+      } catch {
+        // Fall back to bundled JSON payload below.
+      }
+    }
+
+    if (typeof console !== "undefined" && typeof console.warn === "function") {
+      console.warn("Population snapshot unavailable, falling back to bundled JSON", primaryError);
+    }
+
+    return deserializePopulationSnapshot(populationSnapshot as SerializedPopulationSnapshot);
+  }
 }
 
 function deserializeSnapshot(serialized: SerializedDataSnapshot): DataSnapshot {
@@ -456,7 +475,7 @@ function deserializeSnapshot(serialized: SerializedDataSnapshot): DataSnapshot {
 async function makeStaticSnapshot(): Promise<DataSnapshot> {
   const url = getStaticSnapshotUrl();
   try {
-    const serialized = await fetchStaticSnapshotByUrl(url);
+    const serialized = await fetchJsonByUrl<SerializedDataSnapshot>(url);
     return deserializeSnapshot(serialized);
   } catch (primaryError) {
     if (!url.endsWith(".gz")) {
@@ -464,7 +483,7 @@ async function makeStaticSnapshot(): Promise<DataSnapshot> {
     }
 
     const jsonUrl = url.slice(0, -3);
-    const serialized = await fetchStaticSnapshotByUrl(jsonUrl);
+    const serialized = await fetchJsonByUrl<SerializedDataSnapshot>(jsonUrl);
     return deserializeSnapshot(serialized);
   }
 }
@@ -601,7 +620,7 @@ async function loadRuntimeSnapshot(): Promise<DataSnapshot> {
 
 async function makeRealSnapshot(): Promise<DataSnapshot> {
   const nytRawBase = getNytRawBase();
-  const { population, stateNamesByFips, countyNamesByFips, stateOptions } = parsePopulation(populationCsvText);
+  const { population, stateNamesByFips, countyNamesByFips, stateOptions } = await loadPopulationSnapshot();
   const stateFipsByName = new Map<string, number>(
     [...stateNamesByFips.entries()].map(([fips, stateName]) => [stateName, fips])
   );

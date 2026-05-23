@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "data:snapshot": "node scripts/build-static-snapshot.mjs",
+    "data:snapshot": "node scripts/build-static-snapshot.mjs && node scripts/build-population-snapshot.mjs",
+    "data:population": "node scripts/build-population-snapshot.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
