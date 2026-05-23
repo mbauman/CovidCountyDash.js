@@ -1,6 +1,6 @@
 # CovidCountyDash.js
 
-CovidCountyDash.js is a React + TypeScript migration of the original Julia Dash Covid County dashboard.
+CovidCountyDash.js is a low-effort client-side React + TypeScript AI migration of the original Julia [CovidCountyDash.jl](https://github.com/mbauman/CovidCountyDash.jl) server-client dashboard.
 
 ## Goals
 - Preserve feature parity with the Julia dashboard.
