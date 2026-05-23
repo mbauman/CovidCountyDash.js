@@ -182,10 +182,6 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
 
   return (
     <section aria-label="Trend chart" style={styles.panel}>
-      <div style={styles.panelHeader}>
-        <p style={styles.panelSubtitle}>{figure.layout.title?.text ?? "Untitled figure"}</p>
-      </div>
-
       <div data-testid="plotly-figure-shell" style={styles.figureShell}>
         <div ref={plotRootRef} style={styles.figure} />
         {isLoading ? (
