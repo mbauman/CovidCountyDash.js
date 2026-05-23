@@ -78,7 +78,7 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
     }
 
     const setup = async (): Promise<void> => {
-      const module = await import("plotly.js-dist-min");
+      const module = await import("../plotly/plotlyRuntime");
       const runtime = module.default as unknown as PlotlyRuntime;
       runtimeRef.current = runtime;
     };

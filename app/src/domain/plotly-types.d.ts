@@ -1,4 +1,16 @@
-declare module "plotly.js-dist-min" {
+declare module "plotly.js/lib/core" {
+  const Plotly: unknown;
+
+  export default Plotly;
+}
+
+declare module "plotly.js/lib/scatter" {
+  const scatter: unknown;
+
+  export default scatter;
+}
+
+declare module "plotly.js" {
   export interface AxisTitle {
     text?: string;
   }
@@ -19,5 +31,9 @@ declare module "plotly.js-dist-min" {
     name?: string;
     x?: Array<string | number>;
     y?: number[];
+  }
+
+  export interface Config {
+    responsive?: boolean;
   }
 }
