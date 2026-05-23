@@ -5,11 +5,11 @@ interface CaveatNotesProps {
 }
 
 const NOTE_TEXT: string[] = [
-  "NYC consolidated county reporting caveat.",
-  "Kansas City, MO reporting caveat.",
-  "Joplin, MO reporting caveat.",
-  "Unknown county bucket caveat for selected state.",
-  "Selected counties include suppressed population rows."
+  "¹ The five boroughs of New York City (New York, Kings, Queens, Bronx, and Richmond counties) are combined into a single entry",
+  "² Kansas City, MO is reported independently of the four counties it spans (Cass, Clay, Jackson, and Platte counties)",
+  "³ Excluding data from Kansas City, MO",
+  "⁴ Starting June 25, Joplin, MO is reported independently of the two counties it spans (Jasper and Newton counties)",
+  "⁵ Excluding data from Joplin, MO"
 ];
 
 export function CaveatNotes({ visibility }: CaveatNotesProps): JSX.Element {

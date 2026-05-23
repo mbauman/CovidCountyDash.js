@@ -29,6 +29,7 @@ describe("controls layout behavior", () => {
     expect(screen.getByLabelText("New daily cases")).toBeChecked();
     expect(screen.getByLabelText("Normalize by population")).toBeChecked();
     expect(screen.getByLabelText("Log scale")).not.toBeChecked();
+    expect(screen.queryByLabelText("Data caveats")).not.toBeInTheDocument();
   });
 
   it("updates daily value label when switching metric type", async () => {
