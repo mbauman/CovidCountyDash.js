@@ -106,6 +106,23 @@ const SHORT_STATE: Record<number, string> = {
   78: "VI"
 };
 
+const STATE_GROUPS: Array<[string, number[]]> = [
+  ["all", [
+    1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 45, 46,
+    47, 48, 49, 50, 51, 53, 54, 55, 56, 60, 66, 69, 72, 78
+  ]],
+  ["lower49", [
+    1, 4, 5, 6, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48,
+    49, 50, 51, 53, 54, 55, 56
+  ]],
+  ["northeast", [9, 23, 25, 33, 34, 36, 42, 44, 50]],
+  ["midwest", [17, 18, 19, 20, 26, 27, 29, 31, 38, 39, 46, 55]],
+  ["south", [1, 5, 10, 11, 12, 13, 21, 22, 24, 28, 37, 40, 45, 47, 48, 51, 54]],
+  ["west", [4, 6, 8, 16, 30, 32, 35, 41, 49, 53, 56]]
+];
+
 let snapshotPromise: Promise<DataSnapshot> | null = null;
 let cachedSnapshot: DataSnapshot | null = null;
 
@@ -603,33 +620,79 @@ export function buildSelectionLabel(selectedFips: number[], snapshot: DataSnapsh
     return "";
   }
 
+  const labelName = (fips: number): string => {
+    if (fips < 1000) {
+      return SHORT_STATE[fips] ?? String(fips);
+    }
+
+    return snapshot.countyNamesByFips.get(fips) ?? `County ${fips}`;
+  };
+
+  const upperCaseFirst = (value: string): string => {
+    if (value.length === 0) {
+      return value;
+    }
+
+    return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
+  };
+
   const sorted = [...selectedFips].sort((left, right) => left - right);
-  const allStates = sorted.every((fips) => fips < 1000 && !snapshot.countyNamesByFips.has(fips));
-  if (allStates) {
-    return sorted.map((fips) => SHORT_STATE[fips] ?? String(fips)).join(" + ");
+  let remaining = [...sorted];
+  const sameState = remaining.every((fips) => fips >= 1000)
+    && new Set(remaining.map((fips) => Math.floor(fips / 1000))).size === 1;
+  const locations: string[] = [];
+
+  if (remaining.every((fips) => fips < 1000)) {
+    for (const [groupName, group] of STATE_GROUPS) {
+      if (group.every((fips) => remaining.includes(fips))) {
+        locations.push(upperCaseFirst(groupName));
+        const groupSet = new Set(group);
+        remaining = remaining.filter((fips) => !groupSet.has(fips));
+      }
+    }
+
+    locations.push(...remaining.map((fips) => labelName(fips)));
+  } else if (remaining.every((fips) => fips >= 1000)) {
+    if (sameState) {
+      locations.push(...remaining.map((fips) => labelName(fips)));
+    } else {
+      locations.push(...remaining.map((fips) => `${labelName(fips)}, ${labelName(Math.floor(fips / 1000))}`));
+    }
+  } else {
+    return "Strange mix of states and counties";
   }
 
-  const allCounties = sorted.every((fips) => fips >= 1000 || snapshot.countyNamesByFips.has(fips));
-  if (!allCounties) {
-    return "Mixed selection";
+  const firstLocation = locations[0];
+  if (firstLocation == null) {
+    return "";
   }
 
-  const states = [...new Set(sorted.map((fips) => (fips < 1000 ? fips : Math.floor(fips / 1000))))];
-  const sameState = states.length === 1;
-  const countyLabels = sorted.map((fips) => snapshot.countyNamesByFips.get(fips) ?? `County ${fips}`);
+  let label = firstLocation;
+  let didBreak = false;
+
+  for (let index = 1; index < locations.length; index += 1) {
+    const remainingCount = locations.length - index;
+    const remainingLength = locations
+      .slice(index + 1)
+      .reduce((total, location) => total + location.length, 0) + remainingCount * 3;
+    const cutoffText = ` + ${remainingCount} others`;
+
+    if (label.length + cutoffText.length > 40
+      && label.length + remainingLength > label.length + cutoffText.length) {
+      label += cutoffText;
+      didBreak = true;
+      break;
+    }
+
+    label += ` + ${locations[index]}`;
+  }
 
   if (sameState) {
-    const stateCode = SHORT_STATE[states[0] ?? 0] ?? String(states[0] ?? "");
-    return `${countyLabels.join(" + ")}, ${stateCode}`;
+    const stateCode = labelName(Math.floor(remaining[0] / 1000));
+    label += didBreak ? ` in ${stateCode}` : `, ${stateCode}`;
   }
 
-  return sorted
-    .map((fips) => {
-      const stateFips = Math.floor(fips / 1000);
-      const county = snapshot.countyNamesByFips.get(fips) ?? `County ${fips}`;
-      return `${county}, ${SHORT_STATE[stateFips] ?? stateFips}`;
-    })
-    .join(" + ");
+  return label;
 }
 
 export function getCountyOptionsForStates(
