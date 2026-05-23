@@ -126,7 +126,6 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
   return (
     <section aria-label="Trend chart" style={styles.panel}>
       <div style={styles.panelHeader}>
-        <h2 style={styles.panelTitle}>Trend Overview</h2>
         <p style={styles.panelSubtitle}>{figure.layout.title?.text ?? "Untitled figure"}</p>
       </div>
 

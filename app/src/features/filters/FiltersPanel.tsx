@@ -33,10 +33,6 @@ export function FiltersPanel(): JSX.Element {
 
   return (
     <section aria-label="Controls" style={styles.panel}>
-      <div style={styles.headerRow}>
-        <h2 style={styles.header}>Filters</h2>
-      </div>
-
       <div style={styles.controlsRow}>
         <div style={styles.selectionTable}>
           <div style={styles.selectionHead}>

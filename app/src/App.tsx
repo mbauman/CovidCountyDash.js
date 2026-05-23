@@ -34,10 +34,6 @@ export function App(): JSX.Element {
         <PlotFigureCard figure={figure} isLoading={ui.isLoading} lastError={ui.lastError} />
       </section>
 
-      <section style={styles.footerRow}>
-        <p style={styles.statusText}>Active series slots: {activeSeriesCount}</p>
-      </section>
-
       <CaveatNotes visibility={caveatVisibility} />
     </main>
   );

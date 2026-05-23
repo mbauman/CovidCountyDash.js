@@ -13,9 +13,12 @@ const NOTE_TEXT: string[] = [
 ];
 
 export function CaveatNotes({ visibility }: CaveatNotesProps): JSX.Element {
+  if (!visibility.some(Boolean)) {
+    return <></>;
+  }
+
   return (
     <section aria-label="Data caveats" style={styles.wrapper}>
-      <h2 style={styles.title}>Caveats</h2>
       <ul style={styles.list}>
         {NOTE_TEXT.map((text, index) => (
           <li key={text} hidden={!visibility[index]}>
