@@ -21,6 +21,21 @@ interface PlotlyRuntime {
   };
 }
 
+type BrowserGlobal = typeof globalThis & {
+  global?: typeof globalThis;
+};
+
+const PLOTLY_RUNTIME_RELOAD_KEY = "covid-dash-plotly-runtime-reload";
+
+function isRecoverableRuntimeImportError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("importing a module script failed") || message.includes("outdated optimize dep");
+}
+
 function cloneFigureForPlotly(figure: PlotlyFigure): {
   data: Plotly.Data[];
   layout: Partial<Plotly.Layout>;
@@ -77,10 +92,45 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
       return;
     }
 
+    let cancelled = false;
+
     const setup = async (): Promise<void> => {
-      const module = await import("../plotly/plotlyRuntime");
-      const runtime = module.default as unknown as PlotlyRuntime;
-      runtimeRef.current = runtime;
+      try {
+        const browserGlobal = globalThis as BrowserGlobal;
+        if (browserGlobal.global == null) {
+          browserGlobal.global = globalThis;
+        }
+
+        const module = await import("../plotly/plotlyRuntime");
+        const runtime = module.default as unknown as PlotlyRuntime;
+        if (cancelled) {
+          return;
+        }
+
+        runtimeRef.current = runtime;
+        drawFigure(runtime, root, figure);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        if (isRecoverableRuntimeImportError(error)) {
+          try {
+            const hasReloaded = window.sessionStorage.getItem(PLOTLY_RUNTIME_RELOAD_KEY) === "1";
+            if (!hasReloaded) {
+              window.sessionStorage.setItem(PLOTLY_RUNTIME_RELOAD_KEY, "1");
+              window.location.reload();
+              return;
+            }
+          } catch {
+            // If sessionStorage is unavailable, continue and surface the error.
+          }
+        }
+
+        if (typeof console !== "undefined" && typeof console.error === "function") {
+          console.error("Failed to load Plotly runtime", error);
+        }
+      }
     };
 
     void setup();
@@ -96,6 +146,7 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
 
     window.addEventListener("resize", handleResize);
     return () => {
+      cancelled = true;
       window.removeEventListener("resize", handleResize);
       const runtime = runtimeRef.current;
       runtimeRef.current = null;
@@ -118,6 +169,12 @@ export function PlotFigureCard({ figure, isLoading, lastError }: PlotFigureCardP
     const root = plotRootRef.current;
     if (runtime == null || root == null) {
       return;
+    }
+
+    try {
+      window.sessionStorage.removeItem(PLOTLY_RUNTIME_RELOAD_KEY);
+    } catch {
+      // No-op when storage is unavailable.
     }
 
     drawFigure(runtime, root, figure);

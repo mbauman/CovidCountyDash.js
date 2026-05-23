@@ -47,9 +47,9 @@ describe("parity and hardening", () => {
       yAxisType: "linear",
       yAxisTickSuffix: "%",
       traceCount: 1,
-      firstTraceName: "",
-      xLength: 2,
-      yPreview: [Number.NaN, Number.NaN]
+      firstTraceName: "Lower49 + AK + HI",
+      xLength: 3,
+      yPreview: [Number.NaN, 0.9333333333333333, 1.1666666666666667]
     });
   });
 

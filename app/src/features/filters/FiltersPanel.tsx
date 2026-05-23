@@ -495,7 +495,7 @@ const styles: Record<string, CSSProperties> = {
   },
   controlsRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(22rem, 2.2fr) minmax(16rem, 1fr)",
+    gridTemplateColumns: "minmax(24rem, 3fr) minmax(15rem, 1fr)",
     gap: "0.9rem",
     alignItems: "start"
   },

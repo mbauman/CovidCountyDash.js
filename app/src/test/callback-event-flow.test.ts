@@ -37,6 +37,18 @@ describe("callback event flow", () => {
       }
     });
 
+    await waitFor(() => {
+      expect(fetchSeriesContractFn.mock.calls.length).toBeGreaterThanOrEqual(1);
+      expect(pending.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const startupResolve = pending.shift();
+    startupResolve?.(makeContract("Selection 1", 0));
+
+    await waitFor(() => {
+      expect(store.getState().ui.committedRequestId).toBe(1);
+    });
+
     const initialCalls = fetchSeriesContractFn.mock.calls.length;
     const initialPending = pending.length;
 

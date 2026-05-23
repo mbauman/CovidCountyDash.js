@@ -1,6 +1,11 @@
-import Plotly from "plotly.js/lib/core";
-import scatter from "plotly.js/lib/scatter";
+import * as PlotlyModule from "plotly.js/lib/core";
+import * as scatterModule from "plotly.js/lib/scatter";
 
-(Plotly as never as { register: (modules: unknown[]) => void }).register([scatter]);
+const Plotly = ("default" in PlotlyModule ? PlotlyModule.default : PlotlyModule) as unknown as {
+	register: (modules: unknown[]) => void;
+};
+const scatter = ("default" in scatterModule ? scatterModule.default : scatterModule) as unknown;
+
+Plotly.register([scatter]);
 
 export default Plotly;

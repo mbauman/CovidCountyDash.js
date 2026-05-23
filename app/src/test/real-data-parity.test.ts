@@ -63,8 +63,8 @@ describe("real-data parity oracles", () => {
     expect(trace?.x?.length).toBe(1118);
     expect(trace?.x?.[0]).toBe("2020-03-01");
     expect(trace?.x?.[trace.x.length - 1]).toBe("2023-03-23");
-    expect(lastY).toBeCloseTo(0.0053490023, 6);
-    expect(maxY).toBeCloseTo(0.38132718, 6);
+    expect(lastY).toBeCloseTo(0.0051628623, 6);
+    expect(maxY).toBeCloseTo(0.3680573599, 6);
     expect(minY).toBeCloseTo(0, 6);
   }, 150000);
 

@@ -4,6 +4,11 @@ import type { FilterState, GeographySelection, MetricType, ValueMode } from "../
 export type StateGroupName = "all" | "lower49" | "northeast" | "midwest" | "south" | "west";
 
 const blankSelection = (): GeographySelection => ({ stateFips: [], countyFips: [] });
+const DEFAULT_PRIMARY_STATE_FIPS: number[] = [
+  1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+  26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 45, 46,
+  47, 48, 49, 50, 51, 53, 54, 55, 56
+];
 
 const initialState: FilterState = {
   metricType: "cases",
@@ -11,7 +16,14 @@ const initialState: FilterState = {
   rollingDays: 7,
   normalizeByPopulation: true,
   useLogScale: false,
-  selections: [blankSelection(), blankSelection(), blankSelection(), blankSelection(), blankSelection(), blankSelection()]
+  selections: [
+    { stateFips: DEFAULT_PRIMARY_STATE_FIPS, countyFips: [] },
+    blankSelection(),
+    blankSelection(),
+    blankSelection(),
+    blankSelection(),
+    blankSelection()
+  ]
 };
 
 const filtersSlice = createSlice({

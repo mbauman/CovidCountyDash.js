@@ -7,7 +7,7 @@ import type {
   TransformSeriesContract
 } from "../domain/covidData";
 import { buildSeries, buildSeriesContract } from "./transforms";
-import populationCsvText from "../data/pop2019.csv?raw";
+import populationCsvText from "../data/pop2020.csv?raw";
 
 export interface DataServiceInput {
   request: TransformRequest;
@@ -41,6 +41,13 @@ export interface ResolvedSnapshotData {
   dateExtent: [string, string] | null;
 }
 
+const EMPTY_RUNTIME_DATA: ResolvedSnapshotData = {
+  records: [],
+  population: [],
+  stateOptions: [],
+  dateExtent: null
+};
+
 interface SerializedDataSnapshot {
   records: Array<[string, number, number, number]>;
   population: Array<[number, number | null]>;
@@ -52,7 +59,7 @@ interface SerializedDataSnapshot {
 
 const COUNTIES_YEARS = ["2020", "2021", "2022"];
 const DEFAULT_NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
-const DEFAULT_STATIC_SNAPSHOT_URL = "/data/nyt-snapshot.json.gz";
+const DEFAULT_STATIC_SNAPSHOT_PATH = "data/nyt-snapshot.json.gz";
 
 const SHORT_STATE: Record<number, string> = {
   1: "AL",
@@ -188,11 +195,17 @@ function shouldAllowRemoteFallback(): boolean {
 
 function getStaticSnapshotUrl(): string {
   const configured = import.meta.env.VITE_STATIC_SNAPSHOT_URL;
-  if (typeof configured !== "string" || configured.trim() === "") {
-    return DEFAULT_STATIC_SNAPSHOT_URL;
+  const rawPath = typeof configured === "string" && configured.trim() !== ""
+    ? configured.trim()
+    : DEFAULT_STATIC_SNAPSHOT_PATH;
+
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath;
   }
 
-  return configured;
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  return new URL(rawPath.replace(/^\/+/, ""), window.location.origin + normalizedBase).toString();
 }
 
 function isFixtureMode(): boolean {
@@ -405,6 +418,13 @@ async function fetchStaticSnapshotByUrl(url: string): Promise<SerializedDataSnap
 
   if (!url.endsWith(".gz")) {
     return parseStaticJsonResponse(response);
+  }
+
+  try {
+    const maybeJsonText = await response.clone().text();
+    return JSON.parse(maybeJsonText) as SerializedDataSnapshot;
+  } catch {
+    // The response body is still compressed bytes; fall through to explicit gzip decoding.
   }
 
   const body = response.body;
@@ -637,6 +657,10 @@ export function getCachedDataSnapshot(): DataSnapshot | null {
 
 export function resolveSnapshotData(snapshot: DataSnapshot | null): ResolvedSnapshotData {
   if (snapshot == null) {
+    if (!isFixtureMode()) {
+      return EMPTY_RUNTIME_DATA;
+    }
+
     return {
       records: FIXTURE_RECORDS,
       population: FIXTURE_POPULATION,

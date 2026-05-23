@@ -19,7 +19,7 @@ CovidCountyDash.js is a low-effort client-side React + TypeScript AI migration o
 At runtime, the app loads:
 - A local static NYT snapshot (`app/public/data/nyt-snapshot.json.gz`) by default.
 - NYT state/county time-series CSV data as fallback (or primary if configured).
-- Local population reference (`app/src/data/pop2019.csv`).
+- Local population reference (`app/src/data/pop2020.csv`).
 
 The NYT base URL is configurable through `VITE_NYT_RAW_BASE` and defaults to:
 - `https://raw.githubusercontent.com/nytimes/covid-19-data/master`

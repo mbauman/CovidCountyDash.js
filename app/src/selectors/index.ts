@@ -56,6 +56,10 @@ export const selectStateOptions = createSelector(
 export const selectCountyOptionsForStates = (selectedStateFips: number[]): SelectOption[] => {
   const snapshot = getCachedDataSnapshot();
   if (snapshot == null) {
+    if (typeof process === "undefined" || process.env.NODE_ENV !== "test") {
+      return [];
+    }
+
     return FIXTURE_COUNTY_OPTIONS.filter((option) => selectedStateFips.includes(option.value));
   }
 

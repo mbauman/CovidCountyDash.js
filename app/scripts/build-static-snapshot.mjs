@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 
 const COUNTIES_YEARS = ["2020", "2021", "2022"];
 const DEFAULT_NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
-const POPULATION_PATH = new URL("../src/data/pop2019.csv", import.meta.url);
+const POPULATION_PATH = new URL("../src/data/pop2020.csv", import.meta.url);
 const OUTPUT_DIR = new URL("../public/data/", import.meta.url);
 const OUTPUT_JSON = new URL("../public/data/nyt-snapshot.json", import.meta.url);
 const OUTPUT_GZ = new URL("../public/data/nyt-snapshot.json.gz", import.meta.url);

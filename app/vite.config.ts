@@ -6,6 +6,9 @@ const pagesBase = process.env.GITHUB_ACTIONS === "true" && repoName ? `/${repoNa
 
 export default defineConfig({
   base: pagesBase,
+  define: {
+    global: "globalThis"
+  },
   plugins: [react()],
   test: {
     environment: "jsdom",

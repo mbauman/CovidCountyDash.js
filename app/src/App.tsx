@@ -26,11 +26,11 @@ export function App(): JSX.Element {
         <p style={styles.loaded}>Loaded data through: {loadedThroughDate ?? "(pending)"}</p>
       </header>
 
-      <FiltersPanel />
-
       <section style={styles.plotRow}>
         <PlotFigureCard figure={figure} isLoading={ui.isLoading} lastError={ui.lastError} />
       </section>
+
+      <FiltersPanel />
 
       <CaveatNotes visibility={caveatVisibility} />
     </main>
@@ -41,13 +41,13 @@ const styles: Record<string, CSSProperties> = {
   main: {
     fontFamily: "Avenir Next, Segoe UI, sans-serif",
     minHeight: "100vh",
-    padding: "1rem 2%",
+    padding: "2% 5% 0% 5%",
     background: "linear-gradient(180deg, #f0f6ff 0%, #fffdf8 100%)",
     color: "#1f2f3f"
   },
   header: {
-    margin: "0 auto 1rem",
-    maxWidth: "70rem",
+    margin: "0 auto 0.85rem",
+    maxWidth: "72rem",
     textAlign: "center"
   },
   title: {
@@ -63,7 +63,7 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600
   },
   plotRow: {
-    marginTop: "0.9rem"
+    margin: "0 0 1rem"
   },
   footerRow: {
     margin: "0.75rem 0"

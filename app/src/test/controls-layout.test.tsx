@@ -51,18 +51,14 @@ describe("controls layout behavior", () => {
     expect(screen.queryByLabelText("Rolling day average")).not.toBeInTheDocument();
   });
 
-  it("reveals row 2 after selecting row 1 state and re-hides on reset", async () => {
+  it("keeps row 2 visible with preloaded row 1 state selection and after reset", async () => {
     const user = userEvent.setup();
     renderApp();
 
-    expect(screen.getByTestId("selection-row-2")).toHaveAttribute("hidden");
-
-    await user.click(screen.getByLabelText("State row 1"));
-    await user.click(screen.getByText("State 10"));
     expect(screen.getByTestId("selection-row-2")).not.toHaveAttribute("hidden");
 
     await user.click(screen.getByRole("button", { name: "Reset Controls" }));
-    expect(screen.getByTestId("selection-row-2")).toHaveAttribute("hidden");
+    expect(screen.getByTestId("selection-row-2")).not.toHaveAttribute("hidden");
   });
 
   it("opens and closes right-click state and county menus", async () => {
