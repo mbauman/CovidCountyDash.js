@@ -278,6 +278,7 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
           <Select<Option, true>
             isMulti
             isSearchable
+            tabSelectsValue={false}
             closeMenuOnSelect={false}
             hideSelectedOptions={false}
             styles={multiSelectStyles}
@@ -325,6 +326,7 @@ function SelectionRow({ rowIndex, stateOptions }: SelectionRowProps): JSX.Elemen
           <Select<Option, true>
             isMulti
             isSearchable
+            tabSelectsValue={false}
             closeMenuOnSelect={false}
             hideSelectedOptions={false}
             styles={multiSelectStyles}
