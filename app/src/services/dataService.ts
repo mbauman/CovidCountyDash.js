@@ -34,8 +34,18 @@ export interface DataSnapshot {
   dateRange: [string | null, string | null];
 }
 
+interface SerializedDataSnapshot {
+  records: Array<[string, number, number, number]>;
+  population: Array<[number, number | null]>;
+  stateNamesByFips: Array<[number, string]>;
+  countyNamesByFips: Array<[number, string]>;
+  stateOptions: GeographyOption[];
+  dateRange: [string | null, string | null];
+}
+
 const COUNTIES_YEARS = ["2020", "2021", "2022"];
 const DEFAULT_NYT_RAW_BASE = "https://raw.githubusercontent.com/nytimes/covid-19-data/master";
+const DEFAULT_STATIC_SNAPSHOT_URL = "/data/nyt-snapshot.json.gz";
 
 const SHORT_STATE: Record<number, string> = {
   1: "AL",
@@ -114,6 +124,41 @@ function getNytRawBase(): string {
   }
 
   return configured.replace(/\/+$/, "");
+}
+
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const raw = import.meta.env[name];
+  if (typeof raw !== "string") {
+    return defaultValue;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "" || normalized === "1" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+
+  if (normalized === "0" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function shouldPreferStaticSnapshot(): boolean {
+  return envFlag("VITE_PREFER_STATIC_SNAPSHOT", true);
+}
+
+function shouldAllowRemoteFallback(): boolean {
+  return envFlag("VITE_ALLOW_REMOTE_FALLBACK", true);
+}
+
+function getStaticSnapshotUrl(): string {
+  const configured = import.meta.env.VITE_STATIC_SNAPSHOT_URL;
+  if (typeof configured !== "string" || configured.trim() === "") {
+    return DEFAULT_STATIC_SNAPSHOT_URL;
+  }
+
+  return configured;
 }
 
 function isFixtureMode(): boolean {
@@ -313,6 +358,63 @@ function repairMissingFipsFromStateMap(
   return null;
 }
 
+async function parseStaticJsonResponse(response: Response): Promise<SerializedDataSnapshot> {
+  const parsed = (await response.json()) as SerializedDataSnapshot;
+  return parsed;
+}
+
+async function fetchStaticSnapshotByUrl(url: string): Promise<SerializedDataSnapshot> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`failed to fetch static snapshot ${url}: ${response.status}`);
+  }
+
+  if (!url.endsWith(".gz")) {
+    return parseStaticJsonResponse(response);
+  }
+
+  const body = response.body;
+  if (typeof DecompressionStream === "undefined" || body == null) {
+    throw new Error("gzip static snapshot requires DecompressionStream support");
+  }
+
+  const decompressed = body.pipeThrough(new DecompressionStream("gzip"));
+  const text = await new Response(decompressed).text();
+  return JSON.parse(text) as SerializedDataSnapshot;
+}
+
+function deserializeSnapshot(serialized: SerializedDataSnapshot): DataSnapshot {
+  return {
+    records: serialized.records.map(([date, fips, cases, deaths]) => ({
+      date,
+      fips,
+      cases,
+      deaths
+    })),
+    population: serialized.population.map(([fips, pop]) => ({ fips, pop })),
+    stateNamesByFips: new Map(serialized.stateNamesByFips),
+    countyNamesByFips: new Map(serialized.countyNamesByFips),
+    stateOptions: serialized.stateOptions,
+    dateRange: serialized.dateRange
+  };
+}
+
+async function makeStaticSnapshot(): Promise<DataSnapshot> {
+  const url = getStaticSnapshotUrl();
+  try {
+    const serialized = await fetchStaticSnapshotByUrl(url);
+    return deserializeSnapshot(serialized);
+  } catch (primaryError) {
+    if (!url.endsWith(".gz")) {
+      throw primaryError;
+    }
+
+    const jsonUrl = url.slice(0, -3);
+    const serialized = await fetchStaticSnapshotByUrl(jsonUrl);
+    return deserializeSnapshot(serialized);
+  }
+}
+
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -454,7 +556,28 @@ export async function loadDataSnapshot(): Promise<DataSnapshot> {
   }
 
   snapshotPromise = (async () => {
-    const snapshot = isFixtureMode() ? makeFixtureSnapshot() : await makeRealSnapshot();
+    const snapshot = isFixtureMode()
+      ? makeFixtureSnapshot()
+      : await (async () => {
+          if (!shouldPreferStaticSnapshot()) {
+            return makeRealSnapshot();
+          }
+
+          try {
+            return await makeStaticSnapshot();
+          } catch (error) {
+            if (!shouldAllowRemoteFallback()) {
+              throw error;
+            }
+
+            if (typeof console !== "undefined" && typeof console.warn === "function") {
+              console.warn("Static snapshot unavailable, falling back to NYT source", error);
+            }
+
+            return makeRealSnapshot();
+          }
+        })();
+
     cachedSnapshot = snapshot;
     snapshotPromise = null;
     return snapshot;
