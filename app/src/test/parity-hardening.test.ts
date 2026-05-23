@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAppStore } from "../app/store";
 import type { RootState } from "../app/store";
 import {

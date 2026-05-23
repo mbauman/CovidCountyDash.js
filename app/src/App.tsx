@@ -4,7 +4,6 @@ import { CaveatNotes } from "./components/CaveatNotes";
 import { PlotFigureCard } from "./components/PlotFigureCard";
 import { FiltersPanel } from "./features/filters/FiltersPanel";
 import {
-  selectActiveSeriesCount,
   selectCaveatVisibility,
   selectLoadedThroughDate,
   selectPrimaryPlotFigure
@@ -12,7 +11,6 @@ import {
 
 export function App(): JSX.Element {
   const loadedThroughDate = useAppSelector(selectLoadedThroughDate);
-  const activeSeriesCount = useAppSelector(selectActiveSeriesCount);
   const figure = useAppSelector(selectPrimaryPlotFigure);
   const caveatVisibility = useAppSelector(selectCaveatVisibility);
   const ui = useAppSelector((state) => state.ui);

@@ -13,7 +13,7 @@ describe("app shell", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Covid County Dash" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Trend Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Controls" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Trend chart" })).toBeInTheDocument();
   });
 });
